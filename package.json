@@ -1,0 +1,16 @@
+{
+  "name": "aghsorm",
+  "version": "0.1.0",
+  "description": "Aghs's evolved SQL generator.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "The Unlicense",
+  "packageManager": "pnpm@10.20.0",
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
