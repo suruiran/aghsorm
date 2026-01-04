@@ -1,3 +1,7 @@
+import { Op } from "./op.js";
+import { opItemToSQL, pushLimitOffset, pushOrders } from "./utils.js";
+export { Op } from "./op.js";
+
 export type Value =
   | string
   | number
@@ -21,10 +25,8 @@ export interface DBContext {
   checkfuncname?: (fn: string) => boolean;
 }
 
-let ctx: DBContext | null = null;
-
-export function setdbcontext(dbctx: DBContext) {
-  ctx = dbctx;
+declare global {
+  var dbctx: DBContext;
 }
 
 export class Identifier {
@@ -37,12 +39,8 @@ export class Identifier {
 
   op(): Op {
     return new Op("", null, null, {
-      fmt: () => {
-        let txt = this._name;
-        if (ctx) {
-          txt = ctx.quote(this._table, this._name);
-        }
-        return [{ sql: txt }];
+      fmt: (tmp) => {
+        tmp.push({ sql: dbctx.quote(this._table, this._name) });
       },
     });
   }
@@ -50,12 +48,14 @@ export class Identifier {
 
 export class RawSql {
   _sql: string;
+
   constructor(sql: string) {
     this._sql = sql;
   }
+
   op(): Op {
     return new Op("", null, null, {
-      fmt: () => [{ sql: this._sql }],
+      fmt: (tmp) => tmp.push({ sql: this._sql }),
     });
   }
 }
@@ -71,393 +71,14 @@ export function rawsql(eles: TemplateStringsArray, ...exps: any[]) {
   return new RawSql(tmp.join(""));
 }
 
-export type OpItem = Value | Identifier | RawSql | Op;
-export type SimpleOpItem<T> = T | Identifier | RawSql | Op;
-
-// #region utils
-
-function opItemToSQL(item: OpItem, temp: Fragment[]) {
-  if (item instanceof Identifier) {
-    temp.push(...item.op().tosql());
-    return;
-  }
-  if (item instanceof RawSql) {
-    temp.push({ sql: item._sql });
-    return;
-  }
-  if (item instanceof Op) {
-    temp.push(...item.tosql());
-    return;
-  }
-  temp.push({ value: item });
-}
-
-function fmtRightsOp(
-  op: string,
-  left: OpItem | undefined,
-  item: OpItem,
-  ...items: OpItem[]
-) {
-  const tmp = [] as Fragment[];
-  if (typeof left !== "undefined") {
-    opItemToSQL(left, tmp);
-  }
-  if (op) {
-    tmp.push({ sql: `${op} (` });
-  }
-
-  const eles = [item, ...items];
-  for (let i = 0; i < eles.length; i++) {
-    opItemToSQL(eles[i]!, tmp);
-    if (i < eles.length - 1) {
-      tmp.push({ sql: ", " });
-    }
-  }
-
-  if (op) {
-    tmp.push({ sql: ")" });
-  }
-  return tmp;
-}
-
-function pushOrder<T>(temp: Fragment[], orderby?: IOrder<T>[]) {
-  if (!orderby) return;
-  for (const item of orderby) {
-    if (typeof item === "string") {
-      temp.push({ sql: ctx?.quote(null, item) || item });
-    } else {
-      temp.push({
-        sql: `${ctx?.quote(null, item.field) || item.field} ${item.direction}`,
-      });
-    }
-  }
-}
-
-function pushLimit(
-  temp: Fragment[],
-  opts?: { limit?: number; offset?: number }
-) {
-  if (!opts) return;
-  if (opts.limit) {
-    temp.push({ sql: `LIMIT` });
-    temp.push({ value: opts.limit });
-  }
-  if (opts.offset) {
-    temp.push({ sql: `OFFSET` });
-    temp.push({ value: opts.offset });
-  }
-}
-
-// #endregion
+export type IOpableItems = Value | Identifier | RawSql | Op;
+export type ITypedOpableItem<T> = T | Identifier | RawSql | Op;
 
 export interface Fragment {
   sql?: string;
   value?: Value;
 }
 
-type OpToSQLFunc = (
-  left: { val: OpItem } | null,
-  right: { val: OpItem } | null
-) => Fragment[];
-
-export class Op {
-  private _opkind: string;
-  private _left: { val: OpItem } | null;
-  private _right: { val: OpItem } | null;
-  private _tosql: OpToSQLFunc | null;
-  private _bracket: boolean;
-
-  constructor(
-    opkind: string,
-    left: OpItem | undefined,
-    right: OpItem | undefined,
-    opts?: {
-      fmt?: OpToSQLFunc | null;
-      bracket?: boolean;
-    }
-  ) {
-    this._opkind = opkind;
-    this._left = typeof left !== "undefined" ? { val: left } : null;
-    this._right = typeof right !== "undefined" ? { val: right } : null;
-    this._tosql = opts?.fmt || null;
-    this._bracket = opts?.bracket || false;
-  }
-
-  tosql(): Fragment[] {
-    if (this._tosql) {
-      return this._tosql(this._left, this._right);
-    }
-
-    const tmp = [] as Fragment[];
-
-    if (this._left != null) {
-      if (this._bracket) tmp.push({ sql: "(" });
-      opItemToSQL(this._left.val, tmp);
-      if (this._bracket) tmp.push({ sql: ")" });
-    }
-    tmp.push({ sql: this._opkind });
-    if (this._right != null) {
-      if (this._bracket) tmp.push({ sql: "(" });
-      opItemToSQL(this._right.val, tmp);
-      if (this._bracket) tmp.push({ sql: ")" });
-    }
-
-    return tmp;
-  }
-
-  // #region ops
-  static and(left: OpItem | undefined, right: OpItem | undefined) {
-    return new Op("AND", left, right, { bracket: true });
-  }
-
-  and(right: OpItem): Op {
-    return Op.and(this, right);
-  }
-
-  static or(left: OpItem | undefined, right: OpItem | undefined) {
-    return new Op("OR", left, right, { bracket: true });
-  }
-
-  or(right: OpItem): Op {
-    return Op.or(this, right);
-  }
-
-  not(): Op {
-    return new Op("NOT", null, this, { bracket: true });
-  }
-
-  static eq(left: OpItem | undefined, right: OpItem | undefined) {
-    return new Op("=", left, right);
-  }
-
-  eq(right: OpItem): Op {
-    return Op.eq(this, right);
-  }
-
-  static neq(left: OpItem | undefined, right: OpItem | undefined) {
-    return new Op("!=", left, right);
-  }
-
-  neq(right: OpItem): Op {
-    return Op.neq(this, right);
-  }
-
-  static gt(left: OpItem | undefined, right: OpItem | undefined) {
-    return new Op(">", left, right);
-  }
-
-  gt(right: OpItem): Op {
-    return Op.gt(this, right);
-  }
-
-  static gte(left: OpItem | undefined, right: OpItem | undefined) {
-    return new Op(">=", left, right);
-  }
-
-  gte(right: OpItem): Op {
-    return Op.gte(this, right);
-  }
-
-  static lt(left: OpItem | undefined, right: OpItem | undefined) {
-    return new Op("<", left, right);
-  }
-
-  lt(right: OpItem): Op {
-    return Op.lt(this, right);
-  }
-
-  static lte(left: OpItem | undefined, right: OpItem | undefined) {
-    return new Op("<=", left, right);
-  }
-
-  lte(right: OpItem): Op {
-    return Op.lte(this, right);
-  }
-
-  static bracket(item: OpItem): Op {
-    return new Op("", item, null, {
-      fmt: () => {
-        const tmp = [{ sql: "(" }] as Fragment[];
-        opItemToSQL(item, tmp);
-        tmp.push({ sql: ")" });
-        return tmp;
-      },
-    });
-  }
-
-  bracket(): Op {
-    return Op.bracket(this);
-  }
-
-  static in(left: OpItem, item: OpItem, ...items: OpItem[]) {
-    return new Op("", left, null, {
-      fmt: () => {
-        return fmtRightsOp("IN", left, item, ...items);
-      },
-    });
-  }
-
-  in(item: OpItem, ...items: OpItem[]) {
-    return Op.in(this, item, ...items);
-  }
-
-  static notin(left: OpItem, item: OpItem, ...items: OpItem[]) {
-    return new Op("", left, null, {
-      fmt: () => {
-        return fmtRightsOp("NOT IN", left, item, ...items);
-      },
-    });
-  }
-
-  notin(item: OpItem, ...items: OpItem[]) {
-    return Op.notin(this, item, ...items);
-  }
-
-  static between(left: OpItem, begin: OpItem, end: OpItem) {
-    return new Op("", left, null, {
-      fmt: () => {
-        const tmp = [] as Fragment[];
-        opItemToSQL(left, tmp);
-        tmp.push({ sql: "BETWEEN" });
-        opItemToSQL(begin, tmp);
-        tmp.push({ sql: "AND" });
-        opItemToSQL(end, tmp);
-        return tmp;
-      },
-    });
-  }
-
-  between(begin: OpItem, end: OpItem) {
-    return Op.between(this, begin, end);
-  }
-
-  static like(left: OpItem, right: SimpleOpItem<string>) {
-    return new Op("LIKE", left, right);
-  }
-
-  like(right: SimpleOpItem<string>) {
-    return Op.like(this, right);
-  }
-
-  isnull(): Op {
-    return new Op("IS NULL", this, null);
-  }
-
-  static plus(
-    left: SimpleOpItem<number | bigint>,
-    right: SimpleOpItem<number | bigint>
-  ) {
-    return new Op("+", left, right);
-  }
-
-  plus(right: SimpleOpItem<number | bigint>): Op {
-    return Op.plus(this, right);
-  }
-
-  static minus(
-    left: SimpleOpItem<number | bigint>,
-    right: SimpleOpItem<number | bigint>
-  ) {
-    return new Op("-", left, right);
-  }
-
-  minus(right: SimpleOpItem<number | bigint>): Op {
-    return Op.minus(this, right);
-  }
-
-  static multiply(
-    left: SimpleOpItem<number | bigint>,
-    right: SimpleOpItem<number | bigint>
-  ) {
-    return new Op("*", left, right);
-  }
-
-  multiply(right: SimpleOpItem<number | bigint>): Op {
-    return Op.multiply(this, right);
-  }
-
-  static divide(
-    left: SimpleOpItem<number | bigint>,
-    right: SimpleOpItem<number | bigint>
-  ) {
-    return new Op("/", left, right);
-  }
-
-  divide(right: SimpleOpItem<number | bigint>): Op {
-    return Op.divide(this, right);
-  }
-
-  static mod(
-    left: SimpleOpItem<number | bigint>,
-    right: SimpleOpItem<number | bigint>
-  ) {
-    return new Op("%", left, right);
-  }
-
-  mod(right: SimpleOpItem<number | bigint>): Op {
-    return Op.mod(this, right);
-  }
-
-  static pow(
-    left: SimpleOpItem<number | bigint>,
-    right: SimpleOpItem<number | bigint>
-  ) {
-    return new Op("^", left, right);
-  }
-
-  pow(right: SimpleOpItem<number | bigint>): Op {
-    return Op.pow(this, right);
-  }
-
-  static lshift(
-    left: SimpleOpItem<number | bigint>,
-    right: SimpleOpItem<number | bigint>
-  ) {
-    return new Op("<<", left, right);
-  }
-
-  lshift(right: SimpleOpItem<number | bigint>): Op {
-    return Op.lshift(this, right);
-  }
-
-  static rshift(
-    left: SimpleOpItem<number | bigint>,
-    right: SimpleOpItem<number | bigint>
-  ) {
-    return new Op(">>", left, right);
-  }
-
-  rshift(right: SimpleOpItem<number | bigint>): Op {
-    return Op.rshift(this, right);
-  }
-
-  static call(funcname: string, ...args: OpItem[]) {
-    if (ctx && ctx.checkfuncname && !ctx.checkfuncname(funcname)) {
-      throw new Error(`Invalid function name: ${funcname}`);
-    }
-
-    return new Op("", null, null, {
-      fmt: () => {
-        const tmp = [] as Fragment[];
-        tmp.push({ sql: funcname });
-        tmp.push({ sql: "(" });
-        switch (args.length) {
-          case 0: {
-            break;
-          }
-          default: {
-            const [fa, ...rest] = args;
-            tmp.push(...fmtRightsOp("", undefined, fa!, ...rest));
-          }
-        }
-        tmp.push({ sql: ")" });
-        return tmp;
-      },
-    });
-  }
-
-  // #endregion
-}
 
 interface NullString {
   String: string;
@@ -473,13 +94,13 @@ type ExtractFromKeys<T, K extends readonly (keyof T)[]> = Pick<T, K[number]>;
 type ExtractNoInKeys<T, K extends readonly (keyof T)[]> = Omit<T, K[number]>;
 type WithOp<T, Undefinedable extends boolean = false> = {
   [K in keyof T]: Undefinedable extends true
-    ? SimpleOpItem<T[K]> | null | undefined
-    : SimpleOpItem<T[K]> | null;
+  ? ITypedOpableItem<T[K]> | null | undefined
+  : ITypedOpableItem<T[K]> | null;
 };
 
 // prettier-ignore
-type InsertRecord<T, PKS extends readonly (keyof T)[]> = 
-  WithOp<Required<ExtractFromKeys<T, PKS>>> 
+type InsertRecord<T, PKS extends readonly (keyof T)[]> =
+  WithOp<Required<ExtractFromKeys<T, PKS>>>
   &
   WithOp<Partial<ExtractNoInKeys<T, PKS>>, true>;
 
@@ -487,10 +108,42 @@ type PartialRecord<T> = Partial<WithOp<T, true>>;
 
 type IOrder<T> =
   | {
-      field: keyof T & string;
-      direction: "ASC" | "DESC";
-    }
+    field: keyof T & string;
+    direction: "ASC" | "DESC";
+  }
   | (keyof T & string);
+
+export class DDLGenerator<Key> {
+  private _table: Table<any, any>;
+
+  constructor(table: Table<any, any>) {
+    this._table = table;
+  }
+
+  newcol(newcol: IColumn) { }
+  dropcol(col: Key) { }
+  modcol(fromcol: Key, tocol: IColumn): void { }
+  softdrop() { }
+  drop() { }
+}
+
+const TrueOp = rawsql`(1 = 1)`.op();
+
+export interface IOrderOptions<T> {
+  orderby?: IOrder<T>[];
+}
+
+export interface ILimitOptions {
+  limit?: number;
+}
+
+export interface IOffsetOptions {
+  offset?: number;
+}
+
+interface IAllowEmptyWhereOptions {
+  allowemptywhere?: boolean;
+}
 
 export class Table<
   T extends { [K in keyof T]: Value },
@@ -499,46 +152,116 @@ export class Table<
   private _name: string;
   private _fields: IColumn[];
   private _indexes: IIndex[];
+  private _ddl: DDLGenerator<keyof T>;
+
   constructor(name: string, fields: IColumn[], indexes: IIndex[]) {
     this._name = name;
     this._fields = fields;
     this._indexes = indexes;
+
+    this._ddl = new DDLGenerator(this);
   }
 
-  id(key: keyof T & string): Op {
+  get ddl(): DDLGenerator<keyof T> {
+    return this._ddl;
+  }
+
+  field(key: keyof T & string): Op {
     return new Identifier(key, this._name).op();
   }
 
-  newcol(newcol: IColumn) {}
-  dropcol(col: string) {}
-  modcol(fromcol: string, tocol: IColumn): void {}
-
-  insert(record: InsertRecord<T, PKS>): Fragment[] {
-    let tablename = this._name;
-    if (ctx) {
-      tablename = ctx.quote(this._name, null);
-    }
-
+  private _expand_record(record: {
+    [k: string]: IOpableItems;
+  }): [string, IOpableItems][] {
     const pairs = Array.from(Object.entries(record)).filter(
       ([, v]) => typeof v !== "undefined"
     );
     if (pairs.length === 0) {
-      throw new Error("Record must have at least one field for insert");
+      throw new Error("empty record");
     }
+    return pairs;
+  }
+
+  private _record_to_where_op(record: {
+    [k: string]: IOpableItems;
+  }): Op | null {
+    let op: Op | null = null;
+    for (const [key, value] of Object.entries(record)) {
+      const _op = this.field(key as any).eq(value as IOpableItems | Value);
+      if (op) {
+        op = op.and(_op);
+      } else {
+        op = _op;
+      }
+    }
+    return op;
+  }
+
+  insert(record: InsertRecord<T, PKS>): Fragment[] {
+    let tablename = dbctx.quote(this._name, null);
+    const pairs = this._expand_record(record);
     const tmp = [] as Fragment[];
     tmp.push({ sql: `INSERT INTO ${tablename}` });
     tmp.push({ sql: "(" });
-    tmp.push(
-      ...pairs.map(([key]) => ({ sql: ctx ? ctx.quote(null, key) : key }))
-    );
-    tmp.push({ sql: ")" });
-    tmp.push({ sql: "VALUES" });
-    tmp.push({ sql: "(" });
+
+    const size = pairs.length;
+    let idx = 0;
+    for (const [key,] of pairs) {
+      tmp.push({ sql: dbctx.quote(null, key) });
+      idx++;
+      if (idx < size) {
+        tmp.push({ sql: "," });
+      }
+    }
+
+    tmp.push({ sql: ") VALUES (" });
+
+    idx = 0;
     for (const [, item] of pairs) {
-      opItemToSQL(item as OpItem, tmp);
+      opItemToSQL(item, tmp);
+      idx++;
+      if (idx < size) {
+        tmp.push({ sql: "," })
+      }
     }
     tmp.push({ sql: ")" });
     return tmp;
+  }
+
+  _push_where(
+    tmp: Fragment[],
+    where: PartialRecord<T> | Op,
+    opts?: IAllowEmptyWhereOptions
+  ) {
+    let whereop: Op | null = null;
+    if (where instanceof Op) {
+      whereop = where;
+    } else {
+      whereop = this._record_to_where_op(
+        where as { [k: string]: IOpableItems }
+      );
+    }
+    if (!whereop) {
+      if (opts?.allowemptywhere) {
+        whereop = TrueOp;
+      } else {
+        throw new Error("Where clause is required for delete");
+      }
+    }
+    tmp.push({ sql: "WHERE" });
+    whereop.tosql(tmp);
+  }
+
+  _push_opts(
+    tmp: Fragment[],
+    opts?: IOrderOptions<T> &
+      ILimitOptions &
+      IOffsetOptions &
+      IAllowEmptyWhereOptions
+  ) {
+    if (!opts) return;
+    pushOrders(tmp, opts);
+    pushLimitOffset(tmp, opts);
   }
 
   delete(
@@ -547,83 +270,99 @@ export class Table<
       orderby?: IOrder<T>[];
       limit?: number;
       offset?: number;
+      allowemptywhere?: boolean;
     }
   ): Fragment[] {
-    let tablename = this._name;
-    if (ctx) {
-      tablename = ctx.quote(this._name, null);
-    }
+    let tablename = dbctx.quote(this._name, null);
     const tmp = [{ sql: `DELETE FROM ${tablename}` }] as Fragment[];
-    let whereop: Op | null = null;
-    if (!(where instanceof Op)) {
-      let op: Op | null = null;
-      for (const [key, value] of Object.entries(where)) {
-        const _op = this.id(key as any).eq(value as OpItem | Value);
-        if (op) {
-          op = op.and(_op);
-        } else {
-          op = _op;
-        }
-      }
-      whereop = op;
-    } else {
-      whereop = where;
-    }
-    if (!whereop) {
-      throw new Error("Where clause is required for delete");
-    }
-    tmp.push({ sql: "WHERE" });
-    tmp.push(...whereop.tosql());
-
-    if (opts) {
-      pushOrder(tmp, opts.orderby);
-      pushLimit(tmp, opts);
-    }
+    this._push_where(tmp, where, opts);
+    this._push_opts(tmp, opts);
     return tmp;
   }
 
+  equals(record: PartialRecord<T>, opts?: { joinkind?: "AND" | "OR" }): Op {
+    const pairs = this._expand_record(record as any);
+    const joinkind = opts?.joinkind || "AND";
+    return new Op("", undefined, undefined, {
+      fmt(tmp) {
+        tmp.push({ sql: "(" })
+        const size = pairs.length;
+        let i = 0;
+        for (const [k, v] of pairs) {
+          tmp.push({ sql: "(" })
+          tmp.push({ sql: dbctx.quote(null, k) });
+          tmp.push({ sql: "=" });
+          opItemToSQL(v, tmp);
+          tmp.push({ sql: ")" })
+          i++;
+          if (i < size) {
+            tmp.push({ sql: joinkind })
+          }
+        }
+        tmp.push({ sql: ")" })
+      },
+    });
+  }
+
   update(
-    data: PartialRecord<T>,
+    record: PartialRecord<T>,
     where: PartialRecord<T> | Op,
-    opts?: {
-      orderby?: IOrder<T>[];
-      limit?: number;
-      offset?: number;
-    }
+    opts?: IOrderOptions<T> &
+      ILimitOptions &
+      IOffsetOptions &
+      IAllowEmptyWhereOptions
   ): Fragment[] {
-    return [];
+    const tablename = dbctx.quote(this._name, null);
+    const pairs = this._expand_record(record as any);
+    const tmp = [{ sql: `UPDATE ${tablename}` }] as Fragment[];
+    tmp.push({ sql: "SET" });
+
+    const size = pairs.length;
+    let idx = 0;
+    for (const [k, v] of pairs) {
+      tmp.push({ sql: dbctx.quote(null, k) });
+      tmp.push({ sql: "=" });
+      opItemToSQL(v, tmp);
+      idx++;
+      if (idx < size) {
+        tmp.push({ sql: "," });
+      }
+    }
+    this._push_where(tmp, where, opts);
+    this._push_opts(tmp, opts);
+    return tmp;
   }
 
   select(
     where: PartialRecord<T> | Op,
     opts?: {
-      include?: (keyof T)[];
-      exclude?: (keyof T)[];
-      groupby?: (keyof T)[];
-      orderby?: IOrder<T>[];
-      limit?: number;
-      offset?: number;
-    }
+      include?: ((keyof T) & string)[];
+      exclude?: ((keyof T) & string)[];
+      groupby?: ((keyof T) & string)[];
+    } & IOrderOptions<T> &
+      ILimitOptions &
+      IOffsetOptions
   ): Fragment[] {
-    return [];
+    const tablename = dbctx.quote(this._name, null);
+
+    let keys = "*";
+    if (opts && ((opts.include && opts.include.length > 0) || (opts.exclude && opts.exclude.length > 0))) {
+      let _keys = [] as ((keyof T) & string)[];
+      if (opts.include && opts.include.length > 0) {
+        _keys = opts.include;
+      } else {
+        _keys = this._fields.map(v => v.name) as any;
+      }
+      if (opts.exclude && opts.exclude.length > 0) {
+        _keys = _keys.filter(v => !opts.exclude!.includes(v))
+      }
+      _keys = _keys.map(v => dbctx.quote(this._name, v)) as any;
+      keys = _keys.join(", ")
+    }
+
+    const tmp = [{ sql: `SELECT ${keys} FROM ${tablename}` }] as Fragment[];
+    this._push_where(tmp, where, { allowemptywhere: true });
+    this._push_opts(tmp, opts);
+    return tmp;
   }
 }
-
-interface User {
-  id: number;
-  name: string;
-  age: number;
-  birthday: Date;
-  avatar: Uint8Array;
-  is_admin: boolean;
-  created_at: Date;
-}
-
-const user = new Table<User, ["id"]>("user", [], []);
-
-console.log(
-  user.delete(user.id("id").gt(Op.plus(1, 2).bracket()).bracket().bracket(), {
-    orderby: ["age"],
-    limit: 10,
-  })
-);

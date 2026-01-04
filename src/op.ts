@@ -1,0 +1,328 @@
+import type { Fragment, IOpableItems, ITypedOpableItem } from "./index.js";
+import { opItemToSQL } from "./utils.js";
+
+type OpToSQLFunc = (
+    tmp: Fragment[],
+    left: { val: IOpableItems } | null,
+    right: { val: IOpableItems } | null
+) => void;
+
+function fmtRightsOp(
+    tmp: Fragment[],
+    op: string,
+    left: IOpableItems | undefined,
+    item: IOpableItems,
+    ...items: IOpableItems[]
+) {
+    if (typeof left !== "undefined") {
+        opItemToSQL(left, tmp);
+    }
+    if (op) {
+        tmp.push({ sql: `${op} (` });
+    }
+
+    const eles = [item, ...items];
+    for (let i = 0; i < eles.length; i++) {
+        opItemToSQL(eles[i]!, tmp);
+        if (i < eles.length - 1) {
+            tmp.push({ sql: ", " });
+        }
+    }
+
+    if (op) {
+        tmp.push({ sql: ")" });
+    }
+}
+
+export class Op {
+    private _opkind: string;
+    private _left: { val: IOpableItems } | null;
+    private _right: { val: IOpableItems } | null;
+    private _tosql: OpToSQLFunc | null;
+    private _bracket: boolean;
+
+    constructor(
+        opkind: string,
+        left: IOpableItems | undefined,
+        right: IOpableItems | undefined,
+        opts?: {
+            fmt?: OpToSQLFunc | null;
+            bracket?: boolean;
+        }
+    ) {
+        this._opkind = opkind;
+        this._left = typeof left !== "undefined" ? { val: left } : null;
+        this._right = typeof right !== "undefined" ? { val: right } : null;
+        this._tosql = opts?.fmt || null;
+        this._bracket = opts?.bracket || false;
+    }
+
+    tosql(tmp: Fragment[]) {
+        if (this._tosql) {
+            this._tosql(tmp, this._left, this._right);
+            return;
+        }
+
+        if (this._left != null) {
+            if (this._bracket) tmp.push({ sql: "(" });
+            opItemToSQL(this._left.val, tmp);
+            if (this._bracket) tmp.push({ sql: ")" });
+        }
+        tmp.push({ sql: this._opkind });
+        if (this._right != null) {
+            if (this._bracket) tmp.push({ sql: "(" });
+            opItemToSQL(this._right.val, tmp);
+            if (this._bracket) tmp.push({ sql: ")" });
+        }
+    }
+
+    static and(left: IOpableItems | undefined, right: IOpableItems | undefined) {
+        return new Op("AND", left, right, { bracket: true });
+    }
+
+    and(right: IOpableItems): Op {
+        return Op.and(this, right);
+    }
+
+    static or(left: IOpableItems | undefined, right: IOpableItems | undefined) {
+        return new Op("OR", left, right, { bracket: true });
+    }
+
+    or(right: IOpableItems): Op {
+        return Op.or(this, right);
+    }
+
+    not(): Op {
+        return new Op("NOT", null, this, { bracket: true });
+    }
+
+    static eq(left: IOpableItems | undefined, right: IOpableItems | undefined) {
+        return new Op("=", left, right);
+    }
+
+    eq(right: IOpableItems): Op {
+        return Op.eq(this, right);
+    }
+
+    static neq(left: IOpableItems | undefined, right: IOpableItems | undefined) {
+        return new Op("!=", left, right);
+    }
+
+    neq(right: IOpableItems): Op {
+        return Op.neq(this, right);
+    }
+
+    static gt(left: IOpableItems | undefined, right: IOpableItems | undefined) {
+        return new Op(">", left, right);
+    }
+
+    gt(right: IOpableItems): Op {
+        return Op.gt(this, right);
+    }
+
+    static gte(left: IOpableItems | undefined, right: IOpableItems | undefined) {
+        return new Op(">=", left, right);
+    }
+
+    gte(right: IOpableItems): Op {
+        return Op.gte(this, right);
+    }
+
+    static lt(left: IOpableItems | undefined, right: IOpableItems | undefined) {
+        return new Op("<", left, right);
+    }
+
+    lt(right: IOpableItems): Op {
+        return Op.lt(this, right);
+    }
+
+    static lte(left: IOpableItems | undefined, right: IOpableItems | undefined) {
+        return new Op("<=", left, right);
+    }
+
+    lte(right: IOpableItems): Op {
+        return Op.lte(this, right);
+    }
+
+    static bracket(item: IOpableItems): Op {
+        return new Op("", item, null, {
+            fmt: (tmp) => {
+                tmp.push({ sql: "(" })
+                opItemToSQL(item, tmp);
+                tmp.push({ sql: ")" });
+            },
+        });
+    }
+
+    bracket(): Op {
+        return Op.bracket(this);
+    }
+
+    static in(left: IOpableItems, item: IOpableItems, ...items: IOpableItems[]) {
+        return new Op("", left, null, {
+            fmt: (tmp) => {
+                fmtRightsOp(tmp, "IN", left, item, ...items)
+            },
+        });
+    }
+
+    in(item: IOpableItems, ...items: IOpableItems[]) {
+        return Op.in(this, item, ...items);
+    }
+
+    static notin(
+        left: IOpableItems,
+        item: IOpableItems,
+        ...items: IOpableItems[]
+    ) {
+        return new Op("", left, null, {
+            fmt: (tmp) => {
+                fmtRightsOp(tmp, "NOT IN", left, item, ...items);
+            },
+        });
+    }
+
+    notin(item: IOpableItems, ...items: IOpableItems[]) {
+        return Op.notin(this, item, ...items);
+    }
+
+    static between(left: IOpableItems, begin: IOpableItems, end: IOpableItems) {
+        return new Op("", left, null, {
+            fmt: (tmp) => {
+                opItemToSQL(left, tmp);
+                tmp.push({ sql: "BETWEEN" });
+                opItemToSQL(begin, tmp);
+                tmp.push({ sql: "AND" });
+                opItemToSQL(end, tmp);
+            },
+        });
+    }
+
+    between(begin: IOpableItems, end: IOpableItems) {
+        return Op.between(this, begin, end);
+    }
+
+    static like(left: IOpableItems, right: ITypedOpableItem<string>) {
+        return new Op("LIKE", left, right);
+    }
+
+    like(right: ITypedOpableItem<string>) {
+        return Op.like(this, right);
+    }
+
+    isnull(): Op {
+        return new Op("IS NULL", this, null);
+    }
+
+    static plus(
+        left: ITypedOpableItem<number | bigint>,
+        right: ITypedOpableItem<number | bigint>
+    ) {
+        return new Op("+", left, right);
+    }
+
+    plus(right: ITypedOpableItem<number | bigint>): Op {
+        return Op.plus(this, right);
+    }
+
+    static minus(
+        left: ITypedOpableItem<number | bigint>,
+        right: ITypedOpableItem<number | bigint>
+    ) {
+        return new Op("-", left, right);
+    }
+
+    minus(right: ITypedOpableItem<number | bigint>): Op {
+        return Op.minus(this, right);
+    }
+
+    static multiply(
+        left: ITypedOpableItem<number | bigint>,
+        right: ITypedOpableItem<number | bigint>
+    ) {
+        return new Op("*", left, right);
+    }
+
+    multiply(right: ITypedOpableItem<number | bigint>): Op {
+        return Op.multiply(this, right);
+    }
+
+    static divide(
+        left: ITypedOpableItem<number | bigint>,
+        right: ITypedOpableItem<number | bigint>
+    ) {
+        return new Op("/", left, right);
+    }
+
+    divide(right: ITypedOpableItem<number | bigint>): Op {
+        return Op.divide(this, right);
+    }
+
+    static mod(
+        left: ITypedOpableItem<number | bigint>,
+        right: ITypedOpableItem<number | bigint>
+    ) {
+        return new Op("%", left, right);
+    }
+
+    mod(right: ITypedOpableItem<number | bigint>): Op {
+        return Op.mod(this, right);
+    }
+
+    static pow(
+        left: ITypedOpableItem<number | bigint>,
+        right: ITypedOpableItem<number | bigint>
+    ) {
+        return new Op("^", left, right);
+    }
+
+    pow(right: ITypedOpableItem<number | bigint>): Op {
+        return Op.pow(this, right);
+    }
+
+    static lshift(
+        left: ITypedOpableItem<number | bigint>,
+        right: ITypedOpableItem<number | bigint>
+    ) {
+        return new Op("<<", left, right);
+    }
+
+    lshift(right: ITypedOpableItem<number | bigint>): Op {
+        return Op.lshift(this, right);
+    }
+
+    static rshift(
+        left: ITypedOpableItem<number | bigint>,
+        right: ITypedOpableItem<number | bigint>
+    ) {
+        return new Op(">>", left, right);
+    }
+
+    rshift(right: ITypedOpableItem<number | bigint>): Op {
+        return Op.rshift(this, right);
+    }
+
+    static call(funcname: string, ...args: IOpableItems[]) {
+        if (dbctx && dbctx.checkfuncname && !dbctx.checkfuncname(funcname)) {
+            throw new Error(`Invalid function name: ${funcname}`);
+        }
+
+        return new Op("", null, null, {
+            fmt: (tmp) => {
+                tmp.push({ sql: funcname });
+                tmp.push({ sql: "(" });
+                switch (args.length) {
+                    case 0: {
+                        break;
+                    }
+                    default: {
+                        const [fa, ...rest] = args;
+                        fmtRightsOp(tmp, "", undefined, fa!, ...rest);
+                    }
+                }
+                tmp.push({ sql: ")" });
+                return tmp;
+            },
+        });
+    }
+}
