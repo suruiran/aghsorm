@@ -1,4 +1,5 @@
-import type { DBContext, Fragment, Value, IColumn } from "./index.js";
+import type { Fragments } from "./frag.js";
+import type { DBContext, Value } from "./types.js";
 
 export const dummydbctx: DBContext = {
     quote: function (table: string | null, column: string | null): string {
@@ -6,7 +7,7 @@ export const dummydbctx: DBContext = {
         if (table) return table;
         return column!;
     },
-    render: function (fragments: Fragment[]): [string, Value[]] {
+    register: function (fragments: Fragments) {
         const tmp = [] as string[];
         const args = [] as Value[];
         for (const ele of fragments) {
@@ -17,6 +18,6 @@ export const dummydbctx: DBContext = {
             tmp.push(`\$${args.length + 1}`);
             args.push(ele.value!);
         }
-        return [tmp.join(" "), args];
+        console.log([tmp.join(" "), args]);
     },
 };

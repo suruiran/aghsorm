@@ -1,4 +1,4 @@
-import { Table, Op } from "../src/index.ts";
+import { Schema, Op, sql } from "../src/index.ts";
 import { dummydbctx } from "../src/dummy.ts"
 
 globalThis.dbctx = dummydbctx;
@@ -13,38 +13,31 @@ interface User {
     created_at: Date;
 }
 
-const users = new Table<User, ["id"]>("user", [], []);
+const users = new Schema<User, ["id"]>("user", [], []);
 
-console.log(
-    dbctx.render(
-        users.delete(
-            users.field("id").gt(Op.plus(1, 2).bracket()),
-            {
-                orderby: ["age"],
-                limit: 10,
-            }
-        )
-    )
-);
+users.delete(
+    users.field("id").gt(Op.plus(1, 2).bracket()),
+    {
+        orderby: ["age"],
+        limit: 10,
+    }
+).register();
 
-
-console.log(
-    dbctx.render(
-        users.update(
-            { age: Op.plus(users.field("age"), 1), created_at: Op.call("NOW") },
-            Op.gte(users.field("id"), 12).and(
-                users.equals({ is_admin: true })
-            ),
-        )
+dbctx.register(
+    users.update(
+        { age: Op.plus(users.field("age"), 1), created_at: sql`NOW()` },
+        Op.gte(users.field("id"), 12).and(
+            users.equals({ is_admin: true })
+        ),
     )
 )
 
-console.log(
-    dbctx.render(
-        users.select(
-            Op.gte(users.field("id"), 12).and(
-                users.equals({ is_admin: true })
-            ),
-        )
+dbctx.register(
+    users.select(
+        Op.gte(users.field("id"), 12).and(
+            users.equals({ is_admin: true })
+        ),
     )
 )
+
+sql`show tables`.frags.register();

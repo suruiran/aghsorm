@@ -1,5 +1,9 @@
-import type { Fragment, IOpableItems, ITypedOpableItem } from "./index.js";
+import { Fragment, Frags, mksqlfrag } from "./frag.js";
+import { Identifier, RawSql, Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
+
+export type IOpableItems = Value | Identifier | RawSql | Op;
+export type ITypedOpableItem<T> = T | Identifier | RawSql | Op;
 
 type OpToSQLFunc = (
     tmp: Fragment[],
@@ -18,19 +22,19 @@ function fmtRightsOp(
         opItemToSQL(left, tmp);
     }
     if (op) {
-        tmp.push({ sql: `${op} (` });
+        tmp.push(mksqlfrag(`${op} (`));
     }
 
     const eles = [item, ...items];
     for (let i = 0; i < eles.length; i++) {
         opItemToSQL(eles[i]!, tmp);
         if (i < eles.length - 1) {
-            tmp.push({ sql: ", " });
+            tmp.push(Frags.comma);
         }
     }
 
     if (op) {
-        tmp.push({ sql: ")" });
+        tmp.push(Frags.parenthesis.right);
     }
 }
 
@@ -64,15 +68,15 @@ export class Op {
         }
 
         if (this._left != null) {
-            if (this._bracket) tmp.push({ sql: "(" });
+            if (this._bracket) tmp.push(Frags.parenthesis.left);
             opItemToSQL(this._left.val, tmp);
-            if (this._bracket) tmp.push({ sql: ")" });
+            if (this._bracket) tmp.push(Frags.parenthesis.right);
         }
-        tmp.push({ sql: this._opkind });
+        tmp.push(mksqlfrag(this._opkind));
         if (this._right != null) {
-            if (this._bracket) tmp.push({ sql: "(" });
+            if (this._bracket) tmp.push(Frags.parenthesis.left);
             opItemToSQL(this._right.val, tmp);
-            if (this._bracket) tmp.push({ sql: ")" });
+            if (this._bracket) tmp.push(Frags.parenthesis.right);
         }
     }
 
@@ -147,9 +151,9 @@ export class Op {
     static bracket(item: IOpableItems): Op {
         return new Op("", item, null, {
             fmt: (tmp) => {
-                tmp.push({ sql: "(" })
+                tmp.push(Frags.parenthesis.left)
                 opItemToSQL(item, tmp);
-                tmp.push({ sql: ")" });
+                tmp.push(Frags.parenthesis.right);
             },
         });
     }
@@ -190,9 +194,9 @@ export class Op {
         return new Op("", left, null, {
             fmt: (tmp) => {
                 opItemToSQL(left, tmp);
-                tmp.push({ sql: "BETWEEN" });
+                tmp.push(Frags.between);
                 opItemToSQL(begin, tmp);
-                tmp.push({ sql: "AND" });
+                tmp.push(Frags.and);
                 opItemToSQL(end, tmp);
             },
         });
@@ -309,8 +313,8 @@ export class Op {
 
         return new Op("", null, null, {
             fmt: (tmp) => {
-                tmp.push({ sql: funcname });
-                tmp.push({ sql: "(" });
+                tmp.push(mksqlfrag(funcname));
+                tmp.push(Frags.parenthesis.left);
                 switch (args.length) {
                     case 0: {
                         break;
@@ -320,7 +324,7 @@ export class Op {
                         fmtRightsOp(tmp, "", undefined, fa!, ...rest);
                     }
                 }
-                tmp.push({ sql: ")" });
+                tmp.push(Frags.parenthesis.right);
                 return tmp;
             },
         });
