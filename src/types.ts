@@ -1,4 +1,4 @@
-import { Fragments, IRegisterOptions, mksqlfrag } from "./frag.js";
+import { Fragments, IExportOpts, mksqlfrag } from "./frag.js";
 import { Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
 
@@ -13,9 +13,15 @@ export type Value =
 
 
 export interface DBContext {
-    quote(table: string | null, column: string | null): string;
-    checkfuncname?: (fn: string) => boolean;
-    register(fragments: Fragments, opts?: IRegisterOptions): void;
+    quote(id: string): string;
+    register(fragments: Fragments, opts?: IExportOpts): void;
+}
+
+export function quote(scope: string | null, name: string): string {
+    if (scope) {
+        return `${dbctx.quote(scope)}.${dbctx.quote(name)}`;
+    }
+    return dbctx.quote(name);
 }
 
 declare global {
@@ -33,7 +39,7 @@ export class Identifier {
     op(): Op {
         return new Op("", null, null, {
             fmt: (tmp) => {
-                tmp.push(mksqlfrag(dbctx.quote(this._table, this._name)));
+                tmp.push(mksqlfrag(quote(this._table, this._name)));
             },
         });
     }
@@ -56,9 +62,8 @@ export class RawSql {
         return this._frags;
     }
 
-    register(opts: IRegisterOptions): RawSql {
-        dbctx.register(this._frags, opts);
-        return this;
+    export(opts?: IExportOpts) {
+        this._frags.export(opts);
     }
 }
 
@@ -73,6 +78,6 @@ export function sql(eles: TemplateStringsArray, ...exps: any[]): RawSql {
     return new RawSql(tmp);
 }
 
-export function sqlop(eles: TemplateStringsArray, ...exps: any[]): Op {
-    return sql(eles, ...exps).op()
+export function op(eles: TemplateStringsArray, ...exps: any[]): Op {
+    return sql(eles, ...exps).op();
 }

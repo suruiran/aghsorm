@@ -40,8 +40,8 @@ export const Frags = {
     and: mksqlfrag("AND")
 }
 
-export interface IRegisterOptions {
-    name?: string;
+export interface IExportOpts {
+    label?: string;
     isquery?: boolean;
 }
 
@@ -50,9 +50,8 @@ export class Fragments extends Array<Fragment> {
         super();
     }
 
-    register(opts?: IRegisterOptions): Fragments {
+    export(opts?: IExportOpts) {
         dbctx.register(this, opts);
-        return this;
     }
 
     push(...items: Fragment[]): number {

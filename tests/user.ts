@@ -1,4 +1,4 @@
-import { Schema, Op, sql } from "../src/index.ts";
+import { SqlTable, Op, sql } from "../src/index.ts";
 import { dummydbctx } from "../src/dummy.ts"
 
 globalThis.dbctx = dummydbctx;
@@ -13,7 +13,7 @@ interface User {
     created_at: Date;
 }
 
-const users = new Schema<User, ["id"]>("user", [], []);
+const users = new SqlTable<User, ["id"]>("public", "user", [], []);
 
 users.delete(
     users.field("id").gt(Op.plus(1, 2).bracket()),
@@ -21,7 +21,7 @@ users.delete(
         orderby: ["age"],
         limit: 10,
     }
-).register();
+).export();
 
 dbctx.register(
     users.update(
@@ -40,4 +40,4 @@ dbctx.register(
     )
 )
 
-sql`show tables`.frags.register();
+sql`show tables`.frags.export();

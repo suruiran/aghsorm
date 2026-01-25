@@ -1,8 +1,8 @@
 import { DDLGenerator } from "./ddl.js";
-import { Fragment, Fragments, Frags, mksqlfrag } from "./frag.js";
+import { Fragment, Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
 import { IOpableItems, ITypedOpableItem, Op } from "./op.js";
-import { Identifier, sql, Value } from "./types.js";
-import { opItemToSQL, pushLimitOffset, pushOrders } from "./utils.js";
+import { Identifier, quote, sql, Value } from "./types.js";
+import { opItemToSQL } from "./utils.js";
 
 export interface ISQLColumn {
     name: string;
@@ -60,16 +60,18 @@ interface IAllowEmptyWhereOptions {
     allowemptywhere?: boolean;
 }
 
-export class Schema<
+export class SqlTable<
     T extends { [K in keyof T]: Value },
     PKS extends readonly (keyof T)[]
 > {
+    private _schema: string;
     private _name: string;
     private _fields: ISQLColumn[];
     private _indexes: ISQLIndex[];
     private _ddl: DDLGenerator<keyof T>;
 
-    constructor(name: string, fields: ISQLColumn[], indexes: ISQLIndex[]) {
+    constructor(schema: string, name: string, fields: ISQLColumn[], indexes: ISQLIndex[]) {
+        this._schema = schema;
         this._name = name;
         this._fields = fields;
         this._indexes = indexes;
@@ -113,7 +115,7 @@ export class Schema<
     }
 
     insert(record: InsertRecord<T, PKS>): Fragments {
-        let tablename = dbctx.quote(this._name, null);
+        let tablename = quote(this._schema, this._name);
         const pairs = this._expand_record(record);
         const tmp = new Fragments();
         tmp.push(mksqlfrag(`INSERT INTO ${tablename}`));
@@ -122,7 +124,7 @@ export class Schema<
         const size = pairs.length;
         let idx = 0;
         for (const [key] of pairs) {
-            tmp.push(mksqlfrag(dbctx.quote(null, key)));
+            tmp.push(mksqlfrag(dbctx.quote(key)));
             idx++;
             if (idx < size) {
                 tmp.push(Frags.comma);
@@ -188,7 +190,7 @@ export class Schema<
             allowemptywhere?: boolean;
         }
     ): Fragments {
-        let tablename = dbctx.quote(this._name, null);
+        let tablename = quote(this._schema, this._name);
         const tmp = new Fragments();
         tmp.push(mksqlfrag(`DELETE FROM ${tablename}`));
         this._push_where(tmp, where, opts);
@@ -206,7 +208,7 @@ export class Schema<
                 let i = 0;
                 for (const [k, v] of pairs) {
                     tmp.push(Frags.parenthesis.left);
-                    tmp.push(mksqlfrag(dbctx.quote(null, k)));
+                    tmp.push(mksqlfrag(dbctx.quote(k)));
                     tmp.push(Frags.equal);
                     opItemToSQL(v, tmp);
                     tmp.push(Frags.parenthesis.right);
@@ -228,7 +230,7 @@ export class Schema<
             IOffsetOptions &
             IAllowEmptyWhereOptions
     ): Fragments {
-        const tablename = dbctx.quote(this._name, null);
+        const tablename = quote(this._schema, this._name);
         const pairs = this._expand_record(record as any);
         const tmp = new Fragments();
         tmp.push(mksqlfrag(`UPDATE ${tablename}`));
@@ -237,7 +239,7 @@ export class Schema<
         const size = pairs.length;
         let idx = 0;
         for (const [k, v] of pairs) {
-            tmp.push(mksqlfrag(dbctx.quote(null, k)));
+            tmp.push(mksqlfrag(dbctx.quote(k)));
             tmp.push(Frags.equal);
             opItemToSQL(v, tmp);
             idx++;
@@ -260,7 +262,7 @@ export class Schema<
             ILimitOptions &
             IOffsetOptions
     ): Fragments {
-        const tablename = dbctx.quote(this._name, null);
+        const tablename = quote(this._schema, this._name);
 
         let keys = "*";
         if (
@@ -277,7 +279,7 @@ export class Schema<
             if (opts.exclude && opts.exclude.length > 0) {
                 _keys = _keys.filter((v) => !opts.exclude!.includes(v));
             }
-            _keys = _keys.map((v) => dbctx.quote(this._name, v)) as any;
+            _keys = _keys.map((v) => dbctx.quote(v)) as any;
             keys = _keys.join(", ");
         }
         const tmp = new Fragments();
@@ -285,5 +287,38 @@ export class Schema<
         this._push_where(tmp, where, { allowemptywhere: true });
         this._push_opts(tmp, opts);
         return tmp;
+    }
+}
+
+export function pushOrders<T>(temp: Fragment[], opts?: IOrderOptions<T>) {
+    if (!opts || !opts.orderby) return;
+    temp.push(Frags.orderby);
+    const size = opts.orderby.length;
+    let idx = 0;
+    for (const item of opts.orderby) {
+        if (typeof item === "string") {
+            temp.push(mksqlfrag(dbctx.quote(item)));
+        } else {
+            temp.push(mksqlfrag(`${dbctx.quote(item.field)} ${item.direction}`));
+        }
+        idx++;
+        if (idx < size) {
+            temp.push(Frags.comma);
+        }
+    }
+}
+
+export function pushLimitOffset(
+    temp: Fragment[],
+    opts?: ILimitOptions & IOffsetOptions
+) {
+    if (!opts) return;
+    if (opts.limit != null) {
+        temp.push(Frags.limit);
+        temp.push(mkvalfrag(opts.limit));
+    }
+    if (opts.offset != null) {
+        temp.push(Frags.offset);
+        temp.push(mkvalfrag(opts.offset));
     }
 }

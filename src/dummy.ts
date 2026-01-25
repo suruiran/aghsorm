@@ -2,10 +2,8 @@ import type { Fragments } from "./frag.js";
 import type { DBContext, Value } from "./types.js";
 
 export const dummydbctx: DBContext = {
-    quote: function (table: string | null, column: string | null): string {
-        if (table && column) return `${table}.${column}`;
-        if (table) return table;
-        return column!;
+    quote: function (name: string): string {
+        return `\`${name}\``;
     },
     register: function (fragments: Fragments) {
         const tmp = [] as string[];
