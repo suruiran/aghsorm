@@ -83,15 +83,26 @@ export class SqlTable<
     T extends { [K in keyof T & string]: Value },
     PKS extends readonly (keyof T & string)[]
 > {
+    /** @internal */
     private _schema: string;
+    /** @internal */
     private _sqlschema: string;
+    /** @internal */
     private _name: string;
+    /** @internal */
     private _sqlname: string;
+    /** @internal */
+    /** @internal */
     private _fields: ISQLColumn[];
+    /** @internal */
     private _field_map: Map<string, ISQLColumn> | null;
+    /** @internal */
     private _indexes: ISQLIndex[];
+    /** @internal */
     private _fullname: string;
+    /** @internal */
     private _dbctx: DBContext;
+    /** @internal */
     private _ddl: IDDLImpl<keyof T & string>;
 
     constructor(options: ITableOptions<T>) {
@@ -111,6 +122,7 @@ export class SqlTable<
         }
     }
 
+    /** @internal */
     private field_by_name(key: keyof T & string): ISQLColumn | null {
         if (this._field_map) {
             return this._field_map.get(key) || null;
@@ -145,6 +157,7 @@ export class SqlTable<
         return new Identifier(field.sqlname || key, { dbctx: this._dbctx, table: this.name }).op();
     }
 
+    /** @internal */
     private _expand_record(record: {
         [k: string]: IOpableItems;
     }): [string, IOpableItems][] {
@@ -164,6 +177,7 @@ export class SqlTable<
         return pairs;
     }
 
+    /** @internal */
     private _record_to_where_op(record: {
         [k: string]: IOpableItems;
     }): Op | null {
@@ -209,6 +223,7 @@ export class SqlTable<
         return tmp;
     }
 
+    /** @internal */
     private _push_where(
         tmp: Fragments,
         where: PartialRecord<T> | Op,
@@ -233,6 +248,7 @@ export class SqlTable<
         whereop.tosql(tmp);
     }
 
+    /** @internal */
     private _push_opts(
         tmp: Fragment[],
         opts?: IOrderOptions<T> &

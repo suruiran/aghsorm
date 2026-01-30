@@ -50,8 +50,9 @@ export class Fragments extends Array<Fragment> {
         super();
     }
 
-    export(dbctx: DBContext, opts?: IExportOpts) {
+    export(dbctx: DBContext, opts?: IExportOpts): Fragments {
         dbctx.register(this, opts);
+        return this;
     }
 
     push(...items: Fragment[]): number {

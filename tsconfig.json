@@ -25,7 +25,8 @@
 
     "moduleResolution": "nodenext",
 
-    "composite": true
+    "composite": true,
+    "stripInternal": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]

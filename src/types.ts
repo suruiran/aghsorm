@@ -24,9 +24,13 @@ export function quotetable(dbctx: DBContext, scope: string | null, name: string)
 }
 
 export class Identifier {
+    /** @internal */
     private _dbctx: DBContext | null;
+    /** @internal */
     private _table: string | null;
+    /** @internal */
     private _name: string;
+    
     constructor(name: string, opts?: {
         dbctx?: DBContext,
         table?: string,
@@ -54,6 +58,7 @@ export class Identifier {
 }
 
 export class RawSql {
+    /** @internal */
     private _frags: Fragments;
 
     constructor(frags: Fragments) {
@@ -70,8 +75,9 @@ export class RawSql {
         return this._frags;
     }
 
-    export(dbctx: DBContext, opts?: IExportOpts) {
+    export(dbctx: DBContext, opts?: IExportOpts): RawSql {
         this._frags.export(dbctx, opts);
+        return this;
     }
 }
 

@@ -39,10 +39,15 @@ function fmtRightsOp(
 }
 
 export class Op {
+    /** @internal */
     private _opkind: string;
+    /** @internal */
     private _left: { val: IOpableItems } | null;
+    /** @internal */
     private _right: { val: IOpableItems } | null;
+    /** @internal */
     private _tosql: OpToSQLFunc | null;
+    /** @internal */
     private _bracket: boolean;
 
     constructor(
