@@ -1,8 +1,6 @@
 import { SqlTable, Op, sql } from "../src/index.ts";
 import { dummydbctx } from "../src/dummy.ts"
 
-globalThis.dbctx = dummydbctx;
-
 interface User {
     id: number;
     name: string;
@@ -13,7 +11,14 @@ interface User {
     created_at: Date;
 }
 
-const users = new SqlTable<User, ["id"]>("public", "user", [], []);
+const users = new SqlTable<User, ["id"]>({
+    dbctx: dummydbctx,
+    schema: "public",
+    name: "user",
+    fields: [],
+    indexes: [],
+    ddl: {} as any,
+});
 
 users.delete(
     users.field("id").gt(Op.plus(1, 2).bracket()),
@@ -21,9 +26,9 @@ users.delete(
         orderby: ["age"],
         limit: 10,
     }
-).export();
+).export(dummydbctx);
 
-dbctx.register(
+dummydbctx.register(
     users.update(
         { age: Op.plus(users.field("age"), 1), created_at: sql`NOW()` },
         Op.gte(users.field("id"), 12).and(
@@ -32,7 +37,7 @@ dbctx.register(
     )
 )
 
-dbctx.register(
+dummydbctx.register(
     users.select(
         Op.gte(users.field("id"), 12).and(
             users.equals({ is_admin: true })
@@ -40,4 +45,4 @@ dbctx.register(
     )
 )
 
-sql`show tables`.frags.export();
+sql`show tables`.frags.export(dummydbctx);

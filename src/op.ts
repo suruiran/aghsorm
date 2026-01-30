@@ -307,10 +307,6 @@ export class Op {
     }
 
     static call(funcname: string, ...args: IOpableItems[]) {
-        if (dbctx && dbctx.checkfuncname && !dbctx.checkfuncname(funcname)) {
-            throw new Error(`Invalid function name: ${funcname}`);
-        }
-
         return new Op("", null, null, {
             fmt: (tmp) => {
                 tmp.push(mksqlfrag(funcname));

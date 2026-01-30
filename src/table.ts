@@ -1,11 +1,11 @@
-import { DDLGenerator } from "./ddl.js";
 import { Fragment, Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
 import { IOpableItems, ITypedOpableItem, Op } from "./op.js";
-import { Identifier, quote, sql, Value } from "./types.js";
+import { DBContext, Identifier, quotetable, sql, Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 
 export interface ISQLColumn {
     name: string;
+    sqlname?: string;
     sqltype: string;
     nullable: boolean;
     isprimary: boolean;
@@ -19,8 +19,8 @@ export interface ISQLIndex {
     fields: string[];
 }
 
-type ExtractFromKeys<T, K extends readonly (keyof T)[]> = Pick<T, K[number]>;
-type ExtractNoInKeys<T, K extends readonly (keyof T)[]> = Omit<T, K[number]>;
+type ExtractFromKeys<T, K extends readonly (keyof T & string)[]> = Pick<T, K[number]>;
+type ExtractNoInKeys<T, K extends readonly (keyof T & string)[]> = Omit<T, K[number]>;
 type WithOp<T, Undefinedable extends boolean = false> = {
     [K in keyof T]: Undefinedable extends true
     ? ITypedOpableItem<T[K]> | null | undefined
@@ -28,7 +28,7 @@ type WithOp<T, Undefinedable extends boolean = false> = {
 };
 
 // prettier-ignore
-type InsertRecord<T, PKS extends readonly (keyof T)[]> =
+type InsertRecord<T, PKS extends readonly (keyof T & string)[]> =
     WithOp<Required<ExtractFromKeys<T, PKS>>>
     &
     WithOp<Partial<ExtractNoInKeys<T, PKS>>, true>;
@@ -60,31 +60,89 @@ interface IAllowEmptyWhereOptions {
     allowemptywhere?: boolean;
 }
 
+export interface IDDLImpl<Key> {
+    newcol(newcol: ISQLColumn): Fragments;
+    dropcol(col: Key): Fragments;
+    modcol(from: Key, to: ISQLColumn): Fragments;
+    dropindex(index: string): Fragments;
+    createindex(index: ISQLIndex): Fragments;
+}
+
+interface ITableOptions<T extends { [K in keyof T & string]: Value }> {
+    dbctx: DBContext;
+    schema: string;
+    sqlschema?: string;
+    name: string;
+    sqlname?: string;
+    fields: ISQLColumn[];
+    indexes: ISQLIndex[];
+    ddl: IDDLImpl<keyof T & string>;
+}
+
 export class SqlTable<
-    T extends { [K in keyof T]: Value },
-    PKS extends readonly (keyof T)[]
+    T extends { [K in keyof T & string]: Value },
+    PKS extends readonly (keyof T & string)[]
 > {
     private _schema: string;
+    private _sqlschema: string;
     private _name: string;
+    private _sqlname: string;
     private _fields: ISQLColumn[];
+    private _field_map: Map<string, ISQLColumn> | null;
     private _indexes: ISQLIndex[];
-    private _ddl: DDLGenerator<keyof T>;
+    private _fullname: string;
+    private _dbctx: DBContext;
+    private _ddl: IDDLImpl<keyof T & string>;
 
-    constructor(schema: string, name: string, fields: ISQLColumn[], indexes: ISQLIndex[]) {
-        this._schema = schema;
-        this._name = name;
-        this._fields = fields;
-        this._indexes = indexes;
+    constructor(options: ITableOptions<T>) {
+        this._dbctx = options.dbctx;
+        this._schema = options.schema;
+        this._sqlschema = options.sqlschema || this._schema;
+        this._name = options.name;
+        this._sqlname = options.sqlname || this._name;
+        this._fields = options.fields;
+        this._field_map = null;
+        this._indexes = options.indexes;
+        this._ddl = options.ddl;
 
-        this._ddl = new DDLGenerator(this);
+        this._fullname = "";
+        if (this._fields.length > 12) {
+            this._field_map = new Map(this._fields.map((f) => [f.name, f]));
+        }
     }
 
-    get ddl(): DDLGenerator<keyof T> {
+    private field_by_name(key: keyof T & string): ISQLColumn | null {
+        if (this._field_map) {
+            return this._field_map.get(key) || null;
+        }
+        return this._fields.find((f) => f.name === key) || null;
+    }
+
+    get ddl(): IDDLImpl<keyof T & string> {
         return this._ddl;
     }
 
+    get schema(): string {
+        return this._sqlschema || this._schema;
+    }
+
+    get name(): string {
+        return this._sqlname || this._name;
+    }
+
+    get fullname(): string {
+        if (!this._fullname) {
+            this._fullname = quotetable(this._dbctx, this.schema, this.name);
+        }
+        return this._fullname;
+    }
+
     field(key: keyof T & string): Op {
-        return new Identifier(key, this._name).op();
+        const field = this.field_by_name(key);
+        if (!field) {
+            return new Identifier(key).op();
+        }
+        return new Identifier(field.sqlname || key, { dbctx: this._dbctx, table: this.name }).op();
     }
 
     private _expand_record(record: {
@@ -95,6 +153,13 @@ export class SqlTable<
         );
         if (pairs.length === 0) {
             throw new Error("empty record");
+        }
+        for (const pair of pairs) {
+            const key = pair[0];
+            const field = this.field_by_name(key as keyof T & string);
+            if (field) {
+                pair[1] = field.sqlname || key;
+            }
         }
         return pairs;
     }
@@ -115,16 +180,15 @@ export class SqlTable<
     }
 
     insert(record: InsertRecord<T, PKS>): Fragments {
-        let tablename = quote(this._schema, this._name);
         const pairs = this._expand_record(record);
         const tmp = new Fragments();
-        tmp.push(mksqlfrag(`INSERT INTO ${tablename}`));
+        tmp.push(mksqlfrag(`INSERT INTO ${this.fullname}`));
         tmp.push(Frags.parenthesis.left);
 
         const size = pairs.length;
         let idx = 0;
         for (const [key] of pairs) {
-            tmp.push(mksqlfrag(dbctx.quote(key)));
+            tmp.push(mksqlfrag(this._dbctx.quote(key)));
             idx++;
             if (idx < size) {
                 tmp.push(Frags.comma);
@@ -145,7 +209,7 @@ export class SqlTable<
         return tmp;
     }
 
-    _push_where(
+    private _push_where(
         tmp: Fragments,
         where: PartialRecord<T> | Op,
         opts?: IAllowEmptyWhereOptions
@@ -169,7 +233,7 @@ export class SqlTable<
         whereop.tosql(tmp);
     }
 
-    _push_opts(
+    private _push_opts(
         tmp: Fragment[],
         opts?: IOrderOptions<T> &
             ILimitOptions &
@@ -177,7 +241,7 @@ export class SqlTable<
             IAllowEmptyWhereOptions
     ) {
         if (!opts) return;
-        pushOrders(tmp, opts);
+        pushOrders(this._dbctx, tmp, opts);
         pushLimitOffset(tmp, opts);
     }
 
@@ -190,9 +254,8 @@ export class SqlTable<
             allowemptywhere?: boolean;
         }
     ): Fragments {
-        let tablename = quote(this._schema, this._name);
         const tmp = new Fragments();
-        tmp.push(mksqlfrag(`DELETE FROM ${tablename}`));
+        tmp.push(mksqlfrag(`DELETE FROM ${this.fullname}`));
         this._push_where(tmp, where, opts);
         this._push_opts(tmp, opts);
         return tmp;
@@ -200,6 +263,7 @@ export class SqlTable<
 
     equals(record: PartialRecord<T>, opts?: { joinkind?: "AND" | "OR" }): Op {
         const pairs = this._expand_record(record as any);
+        const dbctx = this._dbctx;
         const joinkind = opts?.joinkind || "AND";
         return new Op("", undefined, undefined, {
             fmt(tmp) {
@@ -230,16 +294,15 @@ export class SqlTable<
             IOffsetOptions &
             IAllowEmptyWhereOptions
     ): Fragments {
-        const tablename = quote(this._schema, this._name);
         const pairs = this._expand_record(record as any);
         const tmp = new Fragments();
-        tmp.push(mksqlfrag(`UPDATE ${tablename}`));
+        tmp.push(mksqlfrag(`UPDATE ${this.fullname}`));
         tmp.push(Frags.set);
 
         const size = pairs.length;
         let idx = 0;
         for (const [k, v] of pairs) {
-            tmp.push(mksqlfrag(dbctx.quote(k)));
+            tmp.push(mksqlfrag(this._dbctx.quote(k)));
             tmp.push(Frags.equal);
             opItemToSQL(v, tmp);
             idx++;
@@ -262,8 +325,6 @@ export class SqlTable<
             ILimitOptions &
             IOffsetOptions
     ): Fragments {
-        const tablename = quote(this._schema, this._name);
-
         let keys = "*";
         if (
             opts &&
@@ -279,18 +340,18 @@ export class SqlTable<
             if (opts.exclude && opts.exclude.length > 0) {
                 _keys = _keys.filter((v) => !opts.exclude!.includes(v));
             }
-            _keys = _keys.map((v) => dbctx.quote(v)) as any;
+            _keys = _keys.map((v) => this._dbctx.quote(v)) as any;
             keys = _keys.join(", ");
         }
         const tmp = new Fragments();
-        tmp.push(mksqlfrag(`SELECT ${keys} FROM ${tablename}`));
+        tmp.push(mksqlfrag(`SELECT ${keys} FROM ${this.fullname}`));
         this._push_where(tmp, where, { allowemptywhere: true });
         this._push_opts(tmp, opts);
         return tmp;
     }
 }
 
-export function pushOrders<T>(temp: Fragment[], opts?: IOrderOptions<T>) {
+export function pushOrders<T>(dbctx: DBContext, temp: Fragment[], opts?: IOrderOptions<T>) {
     if (!opts || !opts.orderby) return;
     temp.push(Frags.orderby);
     const size = opts.orderby.length;

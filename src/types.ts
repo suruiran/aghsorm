@@ -1,4 +1,4 @@
-import { Fragments, IExportOpts, mksqlfrag } from "./frag.js";
+import { Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
 import { Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
 
@@ -11,35 +11,43 @@ export type Value =
     | bigint
     | null;
 
-
 export interface DBContext {
     quote(id: string): string;
     register(fragments: Fragments, opts?: IExportOpts): void;
 }
 
-export function quote(scope: string | null, name: string): string {
+export function quotetable(dbctx: DBContext, scope: string | null, name: string): string {
     if (scope) {
         return `${dbctx.quote(scope)}.${dbctx.quote(name)}`;
     }
     return dbctx.quote(name);
 }
 
-declare global {
-    var dbctx: DBContext;
-}
-
 export class Identifier {
+    private _dbctx: DBContext | null;
     private _table: string | null;
     private _name: string;
-    constructor(key: string, table?: string) {
-        this._name = key;
-        this._table = table || null;
+    constructor(name: string, opts?: {
+        dbctx?: DBContext,
+        table?: string,
+    }) {
+        this._dbctx = opts?.dbctx || null;
+        this._name = name;
+        this._table = opts?.table || null;
     }
 
     op(): Op {
         return new Op("", null, null, {
             fmt: (tmp) => {
-                tmp.push(mksqlfrag(quote(this._table, this._name)));
+                if (!this._dbctx) {
+                    if (this._table) {
+                        tmp.push(mksqlfrag(`${this._table}.${this._name}`));
+                        return;
+                    }
+                    tmp.push(mksqlfrag(this._name));
+                    return;
+                }
+                tmp.push(mksqlfrag(quotetable(this._dbctx, this._table, this._name)));
             },
         });
     }
@@ -62,8 +70,8 @@ export class RawSql {
         return this._frags;
     }
 
-    export(opts?: IExportOpts) {
-        this._frags.export(opts);
+    export(dbctx: DBContext, opts?: IExportOpts) {
+        this._frags.export(dbctx, opts);
     }
 }
 
@@ -76,8 +84,4 @@ export function sql(eles: TemplateStringsArray, ...exps: any[]): RawSql {
         }
     }
     return new RawSql(tmp);
-}
-
-export function op(eles: TemplateStringsArray, ...exps: any[]): Op {
-    return sql(eles, ...exps).op();
 }

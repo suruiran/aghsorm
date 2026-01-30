@@ -1,4 +1,4 @@
-import type { Value } from "./types.js";
+import type { DBContext, Value } from "./types.js";
 
 export interface Fragment {
     sql?: string;
@@ -50,7 +50,7 @@ export class Fragments extends Array<Fragment> {
         super();
     }
 
-    export(opts?: IExportOpts) {
+    export(dbctx: DBContext, opts?: IExportOpts) {
         dbctx.register(this, opts);
     }
 
