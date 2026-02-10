@@ -1,6 +1,7 @@
-import { Fragment, Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
-import { IOpableItems, ITypedOpableItem, Op } from "./op.js";
-import { DBContext, Identifier, quotetable, sql, Value } from "./types.js";
+import { type Fragment, type Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
+import { lazy } from "./lazy.js";
+import type { IOpableItems, ITypedOpableItem, Op } from "./op.js";
+import { type DBContext, quotetable, sql, type Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 
 export interface ISQLColumn {
@@ -152,9 +153,9 @@ export class SqlTable<
     field(key: keyof T & string): Op {
         const field = this.field_by_name(key);
         if (!field) {
-            return new Identifier(key).op();
+            return new lazy.Identifier(key).op();
         }
-        return new Identifier(field.sqlname || key, { dbctx: this._dbctx, table: this.name }).op();
+        return new lazy.Identifier(field.sqlname || key, { dbctx: this._dbctx, table: this.name }).op();
     }
 
     /** @internal */
@@ -195,7 +196,7 @@ export class SqlTable<
 
     insert(record: InsertRecord<T, PKS>): Fragments {
         const pairs = this._expand_record(record);
-        const tmp = new Fragments();
+        const tmp = new lazy.Fragments();
         tmp.push(mksqlfrag(`INSERT INTO ${this.fullname}`));
         tmp.push(Frags.parenthesis.left);
 
@@ -230,7 +231,7 @@ export class SqlTable<
         opts?: IAllowEmptyWhereOptions
     ) {
         let whereop: Op | null = null;
-        if (where instanceof Op) {
+        if (where instanceof lazy.Op) {
             whereop = where;
         } else {
             whereop = this._record_to_where_op(
@@ -270,7 +271,7 @@ export class SqlTable<
             allowemptywhere?: boolean;
         }
     ): Fragments {
-        const tmp = new Fragments();
+        const tmp = new lazy.Fragments();
         tmp.push(mksqlfrag(`DELETE FROM ${this.fullname}`));
         this._push_where(tmp, where, opts);
         this._push_opts(tmp, opts);
@@ -281,7 +282,7 @@ export class SqlTable<
         const pairs = this._expand_record(record as any);
         const dbctx = this._dbctx;
         const joinkind = opts?.joinkind || "AND";
-        return new Op("", undefined, undefined, {
+        return new lazy.Op("", undefined, undefined, {
             fmt(tmp) {
                 tmp.push(Frags.parenthesis.left);
                 const size = pairs.length;
@@ -311,7 +312,7 @@ export class SqlTable<
             IAllowEmptyWhereOptions
     ): Fragments {
         const pairs = this._expand_record(record as any);
-        const tmp = new Fragments();
+        const tmp = new lazy.Fragments();
         tmp.push(mksqlfrag(`UPDATE ${this.fullname}`));
         tmp.push(Frags.set);
 
@@ -359,13 +360,15 @@ export class SqlTable<
             _keys = _keys.map((v) => this._dbctx.quote(v)) as any;
             keys = _keys.join(", ");
         }
-        const tmp = new Fragments();
+        const tmp = new lazy.Fragments();
         tmp.push(mksqlfrag(`SELECT ${keys} FROM ${this.fullname}`));
         this._push_where(tmp, where, { allowemptywhere: true });
         this._push_opts(tmp, opts);
         return tmp;
     }
 }
+
+lazy.SqlTable = SqlTable;
 
 export function pushOrders<T>(dbctx: DBContext, temp: Fragment[], opts?: IOrderOptions<T>) {
     if (!opts || !opts.orderby) return;

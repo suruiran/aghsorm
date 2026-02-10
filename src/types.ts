@@ -1,4 +1,5 @@
 import { Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
+import { lazy } from "./lazy.js";
 import { Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
 
@@ -57,6 +58,8 @@ export class Identifier {
     }
 }
 
+lazy.Identifier = Identifier;
+
 export class RawSql {
     /** @internal */
     private _frags: Fragments;
@@ -80,6 +83,8 @@ export class RawSql {
         return this;
     }
 }
+
+lazy.RawSql = RawSql;
 
 export function sql(eles: TemplateStringsArray, ...exps: any[]): RawSql {
     const tmp = new Fragments;

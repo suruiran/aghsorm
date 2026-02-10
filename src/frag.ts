@@ -1,4 +1,5 @@
 import type { DBContext, Value } from "./types.js";
+import { lazy } from "./lazy.js";
 
 export interface Fragment {
     sql?: string;
@@ -64,3 +65,5 @@ export class Fragments extends Array<Fragment> {
         return super.push(...items);
     }
 }
+
+lazy.Fragments = Fragments;

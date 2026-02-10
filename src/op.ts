@@ -1,5 +1,6 @@
-import { Fragment, Frags, mksqlfrag } from "./frag.js";
-import { Identifier, RawSql, Value } from "./types.js";
+import { type Fragment, Frags, mksqlfrag } from "./frag.js";
+import { lazy } from "./lazy.js";
+import type { Identifier, RawSql, Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 
 export type IOpableItems = Value | Identifier | RawSql | Op;
@@ -331,3 +332,5 @@ export class Op {
         });
     }
 }
+
+lazy.Op = Op;
