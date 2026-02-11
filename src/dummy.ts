@@ -16,6 +16,6 @@ export const dummydbctx: DBContext = {
             tmp.push(`\$${args.length + 1}`);
             args.push(ele.value!);
         }
-        console.log([tmp.join(""), args]);
+        console.log([tmp.join(" "), args]);
     },
 };

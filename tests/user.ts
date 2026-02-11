@@ -48,4 +48,4 @@ dummydbctx.register(
 sql`show tables`.frags.export(dummydbctx);
 
 
-sql`select * from ${users}`.export(dummydbctx);
+sql`select * from ${users}`.export(dummydbctx).colrender("is_admin", "boolean");

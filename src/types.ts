@@ -1,6 +1,6 @@
-import { Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
+import { type ExportHandle, Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
-import { Op } from "./op.js";
+import { type Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
 
 export type Value =
@@ -31,7 +31,7 @@ export class Identifier {
     private _table: string | null;
     /** @internal */
     private _name: string;
-    
+
     constructor(name: string, opts?: {
         dbctx?: DBContext,
         table?: string,
@@ -42,7 +42,7 @@ export class Identifier {
     }
 
     op(): Op {
-        return new Op("", null, null, {
+        return new lazy.Op("", null, null, {
             fmt: (tmp) => {
                 if (!this._dbctx) {
                     if (this._table) {
@@ -69,7 +69,7 @@ export class RawSql {
     }
 
     op(): Op {
-        return new Op("", null, null, {
+        return new lazy.Op("", null, null, {
             fmt: (tmp) => tmp.push(...this._frags),
         });
     }
@@ -78,9 +78,8 @@ export class RawSql {
         return this._frags;
     }
 
-    export(dbctx: DBContext, opts?: IExportOpts): RawSql {
-        this._frags.export(dbctx, opts);
-        return this;
+    export(dbctx: DBContext, opts?: IExportOpts): ExportHandle {
+        return this._frags.export(dbctx, opts);
     }
 }
 
