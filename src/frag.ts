@@ -83,12 +83,12 @@ export class ExportHandle {
         return this;
     }
 
-    colrender(colname: string, kind: "datetime", opts?: IDatetimeColRendererOpts): ExportHandle;
-    colrender(colname: string, kind: "enum", items: Iterable<[string, number]>): ExportHandle;
-    colrender(colname: string, kind: "string", opts?: ITxtColRenderOpts): ExportHandle;
-    colrender(colname: string, kind: "uuid"): ExportHandle;
-    colrender(colname: string, kind: "boolean"): ExportHandle;
-    colrender(colname: string, kind: ColRendererKind, opts?: any): ExportHandle {
+    colrender(colnames: string | string[], kind: "datetime", opts?: IDatetimeColRendererOpts): ExportHandle;
+    colrender(colnames: string | string[], kind: "enum", items: Iterable<[string, number]>): ExportHandle;
+    colrender(colnames: string | string[], kind: "string", opts?: ITxtColRenderOpts): ExportHandle;
+    colrender(colnames: string | string[], kind: "uuid"): ExportHandle;
+    colrender(colnames: string | string[], kind: "boolean"): ExportHandle;
+    colrender(colnames: string | string[], kind: ColRendererKind, opts?: any): ExportHandle {
         let record = {} as Record<string, string>;
         if (opts) {
             switch (kind) {
@@ -117,7 +117,16 @@ export class ExportHandle {
             }
         }
         if (!this._opts.colrenderers) this._opts.colrenderers = {};
-        this._opts.colrenderers[colname] = { kind, opts: record };
+
+        const _cols = [] as string[];
+        if (typeof colnames === "string") {
+            _cols.push(colnames);
+        } else {
+            _cols.push(...colnames);
+        }
+        for (const _col of _cols) {
+            this._opts.colrenderers[_col] = { kind, opts: record };
+        }
         return this;
     }
 }

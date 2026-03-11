@@ -77,7 +77,7 @@ interface ITableOptions<T extends { [K in keyof T & string]: Value }> {
     sqlname?: string;
     fields: ISQLColumn[];
     indexes: ISQLIndex[];
-    ddl: IDDLImpl<keyof T & string>;
+    // ddl: IDDLImpl<keyof T & string>;
 }
 
 export class SqlTable<
@@ -104,7 +104,7 @@ export class SqlTable<
     /** @internal */
     private _dbctx: DBContext;
     /** @internal */
-    private _ddl: IDDLImpl<keyof T & string>;
+    // private _ddl: IDDLImpl<keyof T & string>;
 
     constructor(options: ITableOptions<T>) {
         this._dbctx = options.dbctx;
@@ -115,7 +115,7 @@ export class SqlTable<
         this._fields = options.fields;
         this._field_map = null;
         this._indexes = options.indexes;
-        this._ddl = options.ddl;
+        // this._ddl = options.ddl;
 
         this._fullname = "";
         if (this._fields.length > 12) {
@@ -131,9 +131,9 @@ export class SqlTable<
         return this._fields.find((f) => f.name === key) || null;
     }
 
-    get ddl(): IDDLImpl<keyof T & string> {
-        return this._ddl;
-    }
+    // get ddl(): IDDLImpl<keyof T & string> {
+    //     return this._ddl;
+    // }
 
     get schema(): string {
         return this._sqlschema || this._schema;
