@@ -1,9 +1,10 @@
 import { type Fragment, Frags, mksqlfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
+import type { SqlTable } from "./table.js";
 import type { Identifier, RawSql, Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 
-export type IOpableItems = Value | Identifier | RawSql | Op;
+export type IOpableItems = Value | Identifier | RawSql | Op | SqlTable<any, any>;
 export type ITypedOpableItem<T> = T | Identifier | RawSql | Op;
 
 type OpToSQLFunc = (

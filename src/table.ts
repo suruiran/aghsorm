@@ -1,7 +1,7 @@
 import { type Fragment, type Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
 import type { IOpableItems, ITypedOpableItem, Op } from "./op.js";
-import { type DBContext, quotetable, sql, type Value } from "./types.js";
+import { type DBContext, Identifier, quotetable, sql, type Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 
 export interface ISQLColumn {
@@ -103,7 +103,6 @@ export class SqlTable<
     private _fullname: string;
     /** @internal */
     private _dbctx: DBContext;
-    /** @internal */
     // private _ddl: IDDLImpl<keyof T & string>;
 
     constructor(options: ITableOptions<T>) {
@@ -242,12 +241,14 @@ export class SqlTable<
             if (opts?.allowemptywhere) {
                 whereop = TrueOp;
             } else {
-                throw new Error("Where clause is required for delete");
+                throw new Error("Where clause is required");
             }
         }
         tmp.push(Frags.where);
         whereop.tosql(tmp);
     }
+
+
 
     /** @internal */
     private _push_opts(
@@ -290,8 +291,14 @@ export class SqlTable<
                 for (const [k, v] of pairs) {
                     tmp.push(Frags.parenthesis.left);
                     tmp.push(mksqlfrag(dbctx.quote(k)));
-                    tmp.push(Frags.equal);
-                    opItemToSQL(v, tmp);
+
+                    if (v == null) {
+                        tmp.push(Frags.isnull);
+                    } else {
+                        tmp.push(Frags.equal);
+                        opItemToSQL(v, tmp);
+                    }
+
                     tmp.push(Frags.parenthesis.right);
                     i++;
                     if (i < size) {
@@ -332,12 +339,21 @@ export class SqlTable<
         return tmp;
     }
 
+    /** @internal */
+    private _push_groupby(tmp: Fragments, groupby: string[]) {
+        tmp.push(Frags.groupby);
+        for (const k of groupby) {
+            tmp.push(mksqlfrag(this._dbctx.quote(k)));
+        }
+    }
+
     select(
         where: PartialRecord<T> | Op,
         opts?: {
             include?: (keyof T & string)[];
             exclude?: (keyof T & string)[];
             groupby?: (keyof T & string)[];
+            having?: Op;
         } & IOrderOptions<T> &
             ILimitOptions &
             IOffsetOptions
@@ -357,12 +373,29 @@ export class SqlTable<
             if (opts.exclude && opts.exclude.length > 0) {
                 _keys = _keys.filter((v) => !opts.exclude!.includes(v));
             }
+            if (_keys.length < 1) {
+                throw new Error("empty keys");
+            }
             _keys = _keys.map((v) => this._dbctx.quote(v)) as any;
             keys = _keys.join(", ");
         }
         const tmp = new lazy.Fragments();
         tmp.push(mksqlfrag(`SELECT ${keys} FROM ${this.fullname}`));
+
+        // where 
         this._push_where(tmp, where, { allowemptywhere: true });
+
+        // group by, having
+        if (opts?.groupby && opts.groupby.length > 0) {
+            this._push_groupby(tmp, opts.groupby);
+
+            if (opts?.having) {
+                tmp.push(Frags.having);
+                opts.having.tosql(tmp);
+            }
+        }
+
+        // order by, limit, offset
         this._push_opts(tmp, opts);
         return tmp;
     }

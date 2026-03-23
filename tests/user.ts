@@ -17,7 +17,6 @@ const users = new SqlTable<User, ["id"]>({
     name: "user",
     fields: [],
     indexes: [],
-    ddl: {} as any,
 });
 
 users.delete(
@@ -45,7 +44,6 @@ dummydbctx.register(
     )
 )
 
-sql`show tables`.frags.export(dummydbctx);
-
+sql`show tables`.export(dummydbctx);
 
 sql`select * from ${users}`.export(dummydbctx).colrender("is_admin", "boolean");

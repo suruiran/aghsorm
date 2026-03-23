@@ -1,6 +1,6 @@
 import { type ExportHandle, Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
-import { type Op } from "./op.js";
+import { IOpableItems, type Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
 
 export type Value =
@@ -85,12 +85,12 @@ export class RawSql {
 
 lazy.RawSql = RawSql;
 
-export function sql(eles: TemplateStringsArray, ...exps: any[]): RawSql {
+export function sql(eles: TemplateStringsArray, ...exps: IOpableItems[]): RawSql {
     const tmp = new Fragments;
     for (let i = 0; i < eles.length; i++) {
         tmp.push(mksqlfrag(eles[i] as string));
-        if (exps[i] != null) {
-            opItemToSQL(exps[i], tmp)
+        if (i < exps.length) {
+            opItemToSQL(exps[i] as IOpableItems, tmp)
         }
     }
     return new RawSql(tmp);

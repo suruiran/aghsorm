@@ -38,7 +38,10 @@ export const Frags = {
     equal: mksqlfrag("="),
     set: mksqlfrag("SET"),
     between: mksqlfrag("BETWEEN"),
-    and: mksqlfrag("AND")
+    and: mksqlfrag("AND"),
+    isnull: mksqlfrag("IS NULL"),
+    groupby: mksqlfrag("GROUP BY"),
+    having: mksqlfrag("HAVING"),
 }
 
 export interface IColRendererOpts {
@@ -73,8 +76,8 @@ export class ExportHandle {
         this._opts = opts;
     }
 
-    lable(lable: string): ExportHandle {
-        this._opts.label = lable;
+    label(label: string): ExportHandle {
+        this._opts.label = label;
         return this;
     }
 
