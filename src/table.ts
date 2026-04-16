@@ -1,7 +1,7 @@
 import { type Fragment, type Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
 import type { IOpableItems, ITypedOpableItem, Op } from "./op.js";
-import { type DBContext, Identifier, quotetable, sql, type Value } from "./types.js";
+import { type DBContext, quotetable, sql, type Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 
 export interface ISQLColumn {

@@ -1,6 +1,6 @@
 import { type ExportHandle, Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
-import { IOpableItems, type Op } from "./op.js";
+import type { IOpableItems, Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
 
 export type Value =

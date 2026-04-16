@@ -65,7 +65,18 @@ export interface ITxtColRenderOpts {
     encoding?: string;
 }
 
-export const ColRendererKinds = ["datetime", "boolean", "enum", "string", "uuid"] as const;
+export interface IHexColRenderOpts {
+    lowercase?: boolean;
+    sep?: string;
+    linewidth?: number;
+}
+
+export interface IBitmapColRenderOpts {
+    sep?: string;
+    linewidth?: number;
+}
+
+export const ColRendererKinds = ["datetime", "boolean", "enum", "string", "uuid", "hex", "bitmap"] as const;
 export type ColRendererKind = (typeof ColRendererKinds)[number];
 
 export class ExportHandle {
@@ -91,6 +102,8 @@ export class ExportHandle {
     colrender(colnames: string | string[], kind: "string", opts?: ITxtColRenderOpts): ExportHandle;
     colrender(colnames: string | string[], kind: "uuid"): ExportHandle;
     colrender(colnames: string | string[], kind: "boolean"): ExportHandle;
+    colrender(colnames: string | string[], kind: "hex", opts?: IHexColRenderOpts): ExportHandle;
+    colrender(colnames: string | string[], kind: "bitmap", opts?: IBitmapColRenderOpts): ExportHandle;
     colrender(colnames: string | string[], kind: ColRendererKind, opts?: any): ExportHandle {
         let record = {} as Record<string, string>;
         if (opts) {
@@ -112,6 +125,19 @@ export class ExportHandle {
                     for (const [k, v] of tmp) {
                         record[k] = `${v}`;
                     }
+                    break;
+                }
+                case "hex": {
+                    const tmp = opts as IHexColRenderOpts;
+                    if (tmp.lowercase) record.lowercase = tmp.lowercase.toString();
+                    if (tmp.sep) record.sep = tmp.sep;
+                    if (tmp.linewidth) record.linewidth = tmp.linewidth.toString();
+                    break;
+                }
+                case "bitmap": {
+                    const tmp = opts as IBitmapColRenderOpts;
+                    if (tmp.sep) record.sep = tmp.sep;
+                    if (tmp.linewidth) record.linewidth = tmp.linewidth.toString();
                     break;
                 }
                 default: {
