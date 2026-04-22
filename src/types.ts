@@ -1,3 +1,4 @@
+import { type IDBDDL } from "./ddl.js";
 import { type ExportHandle, Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
 import type { IOpableItems, Op } from "./op.js";
@@ -13,6 +14,7 @@ export type Value =
     | null;
 
 export interface DBContext {
+    ddl: IDBDDL;
     quote(id: string): string;
     register(fragments: Fragments, opts?: IExportOpts): void;
 }
@@ -94,4 +96,24 @@ export function sql(eles: TemplateStringsArray, ...exps: IOpableItems[]): RawSql
         }
     }
     return new RawSql(tmp);
+}
+
+export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | number | string | null)[]): Fragments {
+    const tmp = new Fragments;
+    for (let i = 0; i < eles.length; i++) {
+        tmp.push(mksqlfrag(eles[i] as string));
+        if (i < exps.length) {
+            const ele = exps[i];
+            if (ele === null) {
+                tmp.push(mksqlfrag("NULL"));
+                continue;
+            }
+            if (ele instanceof Fragments) {
+                tmp.push(...ele);
+                continue;
+            }
+            tmp.push(mksqlfrag(`${ele}`));
+        }
+    }
+    return tmp;
 }

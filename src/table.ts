@@ -3,6 +3,7 @@ import { lazy } from "./lazy.js";
 import type { IOpableItems, ITypedOpableItem, Op } from "./op.js";
 import { type DBContext, quotetable, sql, type Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
+import { type ITableDDL } from "./ddl.js";
 
 export interface ISQLColumn {
     name: string;
@@ -61,14 +62,6 @@ interface IAllowEmptyWhereOptions {
     allowemptywhere?: boolean;
 }
 
-export interface IDDLImpl<Key> {
-    newcol(newcol: ISQLColumn): Fragments;
-    dropcol(col: Key): Fragments;
-    modcol(from: Key, to: ISQLColumn): Fragments;
-    dropindex(index: string): Fragments;
-    createindex(index: ISQLIndex): Fragments;
-}
-
 interface ITableOptions<T extends { [K in keyof T & string]: Value }> {
     dbctx: DBContext;
     schema: string;
@@ -77,7 +70,7 @@ interface ITableOptions<T extends { [K in keyof T & string]: Value }> {
     sqlname?: string;
     fields: ISQLColumn[];
     indexes: ISQLIndex[];
-    // ddl: IDDLImpl<keyof T & string>;
+    ddl: ITableDDL<keyof T & string>;
 }
 
 export class SqlTable<

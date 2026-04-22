@@ -25,3 +25,8 @@ export function opItemToSQL(item: IOpableItems, temp: Fragment[]) {
     }
     temp.push(mkvalfrag(item));
 }
+
+
+export function QuoteSQLStringLiteral(v: string) {
+    return `'${v.replaceAll("'", "''")}'`;
+}
