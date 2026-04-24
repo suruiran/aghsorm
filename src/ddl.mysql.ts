@@ -15,7 +15,6 @@ export class MysqlDialect {
         collate?: string;
         comment?: string;
         compression?: "ZLIB" | "LZ4";
-        connection?: string;
         dataDirectory?: string;
         indexDirectory?: string;
         delayKeyWrite?: boolean;
@@ -41,11 +40,6 @@ export class MysqlDialect {
         union?: string[];
 
         // CONSTRAINTS:
-        unique?: {
-            cols: string[];
-            name?: string;
-            kind?: "INDEX" | "KEY";
-        };
         check?: {
             frags: Fragments;
             enforced?: boolean;
@@ -65,7 +59,7 @@ export class MysqlDialect {
             storage?: "DISK" | "MEMORY";
             check?: {
                 frags: Fragments;
-                notEnforced?: boolean;
+                enforced?: boolean;
             };
             as?: Fragments;
             after?: string;
@@ -177,9 +171,9 @@ function mysqltext(base: string) {
 }
 
 function decimal(base: string) {
-    return (opts?: { precision?: number, scale?: number }) => {
+    return (opts?: { precision?: number; scale?: number; unsigned?: boolean }) => {
         if (!opts || !opts.precision) return base;
         if (opts?.scale == null) return `${base}(${opts?.precision})`;
-        return `${base}(${opts?.precision}, ${opts?.scale})`
+        return mysqlint(`${base}(${opts?.precision}, ${opts?.scale})`)({ unsigned: opts?.unsigned || false })
     }
 }
