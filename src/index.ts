@@ -6,9 +6,10 @@ export {
     type ITableDDL, type IDBDDL, type IDDLCol,
     renderddl,
 } from "./ddl.js";
-
 export { QuoteSQLStringLiteral } from "./utils.js";
+
 export { SqliteDialect } from "./ddl.sqlite.js";
 export { MysqlDialect } from "./ddl.mysql.js";
 export { PostgreSQLDialect } from "./ddl.postgresql.js";
 export { MssqlDialect } from "./ddl.mssql.js";
+export { Ibmdb2Dialect } from "./ddl.ibmdb2.js";
