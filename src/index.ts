@@ -11,3 +11,4 @@ export { QuoteSQLStringLiteral } from "./utils.js";
 export { SqliteDialect } from "./ddl.sqlite.js";
 export { MysqlDialect } from "./ddl.mysql.js";
 export { PostgreSQLDialect } from "./ddl.postgresql.js";
+export { MssqlDialect } from "./ddl.mssql.js";
