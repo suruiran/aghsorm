@@ -10,7 +10,7 @@ export class ClickhouseDialect {
         engine?: string;
         comment?: string;
         cluster?: string;
-        orderby?: Fragments;
+        orderBy?: Fragments;
     }): Record<string, any> {
         return { ...opts };
     }
@@ -73,7 +73,7 @@ export class ClickhouseDialect {
         time64: precisiontype("Time64"),
         datetime64: (opts?: { tz?: string; precision?: number }) => {
             let val = "DateTime64";
-            const precision = opts?.precision || 3;
+            const precision = opts?.precision ?? 3;
             if (opts?.tz) {
                 val = `${val}(${precision}, ${QuoteSQLStringLiteral(opts.tz)})`;
             }
