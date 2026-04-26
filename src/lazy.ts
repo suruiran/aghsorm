@@ -10,3 +10,5 @@ export const lazy = {
     Identifier: {} as any as typeof Identifier,
     Fragments: {} as any as typeof Fragments,
 };
+
+export const DBCtxKey = "aghsorm.dbctx";

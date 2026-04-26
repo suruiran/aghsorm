@@ -1,8 +1,9 @@
 import { type IDBDDL } from "./ddl.js";
 import { type ExportHandle, Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
-import { lazy } from "./lazy.js";
+import { DBCtxKey, lazy } from "./lazy.js";
 import type { IOpableItems, Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
+import "zone.js";
 
 export type Value =
     | string
@@ -13,10 +14,14 @@ export type Value =
     | bigint
     | null;
 
-export interface DBContext {
-    ddl: IDBDDL;
+export interface DBContext extends IDBDDL {
     quote(id: string): string;
     register(fragments: Fragments, opts?: IExportOpts): void;
+}
+
+export function run(name: string, ctx: DBContext, fnc: () => any) {
+    const scope = Zone.current.fork({ name, properties: { [DBCtxKey]: ctx } });
+    return scope.run(fnc);
 }
 
 export function quotetable(dbctx: DBContext, scope: string | null, name: string): string {
@@ -80,8 +85,8 @@ export class RawSql {
         return this._frags;
     }
 
-    export(dbctx: DBContext, opts?: IExportOpts): ExportHandle {
-        return this._frags.export(dbctx, opts);
+    export(opts?: IExportOpts): ExportHandle {
+        return this._frags.export(opts);
     }
 }
 

@@ -1,6 +1,6 @@
 export { Op } from "./op.js";
 export { SqlTable } from "./table.js";
-export { sql, rawsql, type DBContext } from "./types.js";
+export { sql, rawsql, run, type DBContext } from "./types.js";
 export { Fragments, type IExportOpts, mksqlfrag, mkvalfrag, isfrag, Frags } from "./frag.js";
 export {
     type ITableDDL, type IDBDDL, type IDDLCol,

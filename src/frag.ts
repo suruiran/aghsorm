@@ -1,5 +1,5 @@
-import type { DBContext, Value } from "./types.js";
-import { lazy } from "./lazy.js";
+import { type DBContext, type Value } from "./types.js";
+import { lazy, DBCtxKey } from "./lazy.js";
 
 export interface Fragment {
     sql?: string;
@@ -165,9 +165,13 @@ export class Fragments extends Array<Fragment> {
         super();
     }
 
-    export(dbctx: DBContext, opts?: IExportOpts): ExportHandle {
+    export(opts?: IExportOpts): ExportHandle {
         const _opts = opts || {};
         const handle = new ExportHandle(_opts);
+        const dbctx = Zone.current.get(DBCtxKey) as DBContext | undefined;
+        if (!dbctx) {
+            throw new Error("aghsorm: can not find DBContext in Zone.");
+        }
         dbctx.register(this, _opts);
         return handle;
     }

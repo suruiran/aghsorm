@@ -7,6 +7,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      zone.js:
+        specifier: ^0.16.1
+        version: 0.16.1
     devDependencies:
       tsdown:
         specifier: 0.19.0-beta.2
@@ -310,6 +314,9 @@ packages:
       synckit:
         optional: true
 
+  zone.js@0.16.1:
+    resolution: {integrity: sha512-dpvY17vxYIW3+bNrP0ClUlaiY0CiIRK3tnoLaGoQsQcY9/I/NpzIWQ7tQNhbV7LacQMpCII6wVzuL3tuWOyfuA==}
+
 snapshots:
 
   '@babel/generator@7.28.5':
@@ -551,3 +558,5 @@ snapshots:
   unrun@0.2.22:
     dependencies:
       rolldown: 1.0.0-beta.58
+
+  zone.js@0.16.1: {}
