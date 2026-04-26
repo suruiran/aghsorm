@@ -6,7 +6,6 @@ export class DuckdbDialect {
     static tableopts(opts?: {
         temp?: boolean;
         ifNotExists?: boolean;
-        withNoData?: boolean;
         check?: Fragments;
     }): Record<string, any> {
         return { ...opts };

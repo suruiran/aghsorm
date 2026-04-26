@@ -4,9 +4,6 @@ import { Fragments } from "./frag.js";
 
 export class Ibmdb2Dialect {
     static tableopts(opts?: {
-        like?: string;
-        copy?: Fragments;
-
         in?: {
             database?: string;
             tablespace: string;
@@ -22,7 +19,7 @@ export class Ibmdb2Dialect {
         withRestrictOnDrop?: boolean;
         volatile?: {
             enable: boolean;
-            cardinality?: number;
+            cardinality?: boolean;
         };
         logged?: boolean;
         compress?: "NO" | "YES" | "YES FIXEDLENGTH" | "YES HUFFMAN";

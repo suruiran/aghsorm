@@ -4,7 +4,6 @@ import { Fragments } from "./frag.js";
 
 export class MssqlDialect {
     static tableopts(opts?: {
-        asFileTable?: boolean;
         check?: Fragments;
         with?: Record<string, any>;
     }): Record<string, any> {
@@ -84,6 +83,9 @@ export class MssqlDialect {
         binary: lentype("binary"),
         varbinary: lentype("varbinary"),
         json: () => "json",
+        nchar: lentype("nchar"),
+        nvarchar: lentype("nvarchar"),
+        ntext: () => "ntext",
     }
 }
 

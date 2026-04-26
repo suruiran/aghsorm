@@ -18,7 +18,6 @@ export class PostgreSQLDialect {
             frags: Fragments;
             inherit?: boolean;
         };
-        withoutOids?: boolean;
     }): Record<string, any> {
         return { ...opts };
     }

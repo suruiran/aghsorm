@@ -28,7 +28,6 @@ export class MysqlDialect {
         packKeys?: boolean;
         password?: string;
         rowFormat?: "DYNAMIC" | "FIXED" | "COMPRESSED" | "REDUNDANT" | "COMPACT";
-        startTransaction?: boolean;
         secondaryEngineAttribute?: string;
         statsAutoRecalc?: boolean;
         statsPersistent?: boolean;
@@ -62,7 +61,6 @@ export class MysqlDialect {
                 enforced?: boolean;
             };
             as?: Fragments;
-            after?: string;
         }
     ): Record<string, any> {
         return { ...opts, extra: { ...opts.extra, ...extra } };

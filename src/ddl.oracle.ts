@@ -4,7 +4,6 @@ import { Fragments } from "./frag.js";
 
 export class OracleDialect {
     static tableopts(opts?: {
-        scope?: "GLOBAL" | "PRIVATE";
         temporary?: boolean;
         sharded?: boolean;
         duplicated?: boolean;
@@ -22,10 +21,6 @@ export class OracleDialect {
         };
 
         collation?: string;
-        oncommit?: {
-            definition?: "DROP" | "PRESERVE";
-            rows?: "DELETE" | "PRESERVE";
-        };
         properties?: {
             physical?: Fragments;
             table?: Fragments;
@@ -98,14 +93,14 @@ export class OracleDialect {
         date: () => "DATE",
         timestamp: (opts?: {
             precision?: number;
-            wthtz?: boolean;
+            withtz?: boolean;
             local?: boolean;
         }) => {
             let val = "TIMESTAMP";
             if (opts?.precision) {
                 val = `${val}(${opts?.precision})`;
             }
-            if (opts?.wthtz) {
+            if (opts?.withtz) {
                 val = `${val} WITH ${opts?.local ? "LOCAL " : ""}TIME ZONE`;
             }
             return val;
