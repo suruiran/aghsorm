@@ -14,3 +14,5 @@ export { PostgreSQLDialect } from "./ddl.postgresql.js";
 export { MssqlDialect } from "./ddl.mssql.js";
 export { Ibmdb2Dialect } from "./ddl.ibmdb2.js";
 export { OracleDialect } from "./ddl.oracle.js";
+export { DuckdbDialect } from "./ddl.duckdb.js";
+export { ClickhouseDialect } from "./ddl.clickhouse.js";
