@@ -1,4 +1,4 @@
-import type { Fragments } from "./frag.js";
+import { Fragments } from "./frag.js";
 import type { DBContext, Value } from "./types.js";
 
 export const dummydbctx: DBContext = {
@@ -17,5 +17,8 @@ export const dummydbctx: DBContext = {
             args.push(ele.value!);
         }
         console.log([tmp.join(" "), args]);
+    },
+    addtable() {
+        return new Fragments();
     },
 };

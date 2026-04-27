@@ -1,5 +1,5 @@
 import { type IDBDDL } from "./ddl.js";
-import { type ExportHandle, Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
+import { type ExportHandle, Fragments, type IExportOpts, mksqlfrag, type Batch } from "./frag.js";
 import { DBCtxKey, lazy } from "./lazy.js";
 import type { IOpableItems, Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
@@ -19,7 +19,7 @@ export interface DBContext extends IDBDDL {
     register(fragments: Fragments, opts?: IExportOpts): void;
 }
 
-export function run(name: string, ctx: DBContext, fnc: () => any) {
+export function runInCtx(name: string, ctx: DBContext, fnc: () => any) {
     const scope = Zone.current.fork({ name, properties: { [DBCtxKey]: ctx } });
     return scope.run(fnc);
 }

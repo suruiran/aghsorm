@@ -17,8 +17,8 @@ export interface ISQLColumn {
 
 export interface ISQLIndex {
     name: string;
-    unique?: boolean;
-    fields: string[];
+    cols?: string[];
+    expr?: string;
 }
 
 type ExtractFromKeys<T, K extends readonly (keyof T & string)[]> = Pick<T, K[number]>;
@@ -96,7 +96,8 @@ export class SqlTable<
     private _fullname: string;
     /** @internal */
     private _dbctx: DBContext;
-    // private _ddl: IDDLImpl<keyof T & string>;
+    /** @internal */
+    private _ddl: ITableDDL<keyof T & string>;
 
     constructor(options: ITableOptions<T>) {
         this._dbctx = options.dbctx;
@@ -107,7 +108,7 @@ export class SqlTable<
         this._fields = options.fields;
         this._field_map = null;
         this._indexes = options.indexes;
-        // this._ddl = options.ddl;
+        this._ddl = options.ddl;
 
         this._fullname = "";
         if (this._fields.length > 12) {
@@ -123,9 +124,9 @@ export class SqlTable<
         return this._fields.find((f) => f.name === key) || null;
     }
 
-    // get ddl(): IDDLImpl<keyof T & string> {
-    //     return this._ddl;
-    // }
+    get ddl(): ITableDDL<keyof T & string> {
+        return this._ddl;
+    }
 
     get schema(): string {
         return this._sqlschema || this._schema;
@@ -164,7 +165,7 @@ export class SqlTable<
             const key = pair[0];
             const field = this.field_by_name(key as keyof T & string);
             if (field) {
-                pair[1] = field.sqlname || key;
+                pair[0] = field.sqlname || key;
             }
         }
         return pairs;
@@ -304,8 +305,8 @@ export class SqlTable<
     }
 
     update(
-        record: PartialRecord<T>,
         where: PartialRecord<T> | Op,
+        record: PartialRecord<T>,
         opts?: IOrderOptions<T> &
             ILimitOptions &
             IOffsetOptions &

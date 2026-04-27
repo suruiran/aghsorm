@@ -1,7 +1,10 @@
 export { Op } from "./op.js";
 export { SqlTable } from "./table.js";
-export { sql, rawsql, run, type DBContext } from "./types.js";
-export { Fragments, type IExportOpts, mksqlfrag, mkvalfrag, isfrag, Frags } from "./frag.js";
+export { sql, rawsql, runInCtx, type DBContext } from "./types.js";
+export {
+    Fragments, type IExportOpts, mksqlfrag, mkvalfrag,
+    isfrag, Frags, batch, Batch, runInAddBatch
+} from "./frag.js";
 export {
     type ITableDDL, type IDBDDL, type IDDLCol,
     renderddl,

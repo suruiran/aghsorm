@@ -49,6 +49,56 @@ export interface IColRendererOpts {
     opts?: Record<string, string>;
 }
 
+export class Batch<T> {
+    name: string;
+    eles: T[];
+
+    /** @internal */
+    _fnc!: () => any;
+    /** @internal */
+    #execed: boolean;
+
+    /** @internal */
+    constructor(name: string) {
+        this.name = name;
+        this.eles = [];
+        this.#execed = false;
+    }
+
+    exec() {
+        if (this.#execed) return;
+        this.#execed = true;
+        return this._fnc();
+    }
+}
+
+const BatchKey = "aghsorm.batch";
+const AddBatchKey = "aghsorm.addbatch";
+
+type AddBatch<T> = (batch: Batch<T>) => void;
+
+export function runInAddBatch<T>(name: string, add: AddBatch<T>, fnc: () => any) {
+    const scope = Zone.current.fork({ name, properties: { [AddBatchKey]: add } });
+    return scope.run(fnc);
+}
+
+export function batch<T>(name: string, fnc: () => T) {
+    const cb = Zone.current.get(BatchKey);
+    if (cb) {
+        throw new Error(`aghsorm: You are already in a batch scope, ${cb.name}`);
+    }
+    const batch = new Batch<T>(name);
+    const addbatch = Zone.current.get(AddBatchKey) as AddBatch<T> | undefined;
+    if (!addbatch) {
+        throw new Error(`aghsorm: You are not in a batch scope.`);
+    }
+    addbatch(batch);
+    const scope = Zone.current.fork({ name: `zoneof: batch ${name}`, properties: { [BatchKey]: batch } });
+    batch._fnc = () => {
+        return scope.run(fnc);
+    }
+}
+
 export interface IExportOpts {
     label?: string;
     isquery?: boolean;
@@ -97,14 +147,21 @@ export class ExportHandle {
         return this;
     }
 
-    colrender(colnames: string | string[], kind: "datetime", opts?: IDatetimeColRendererOpts): ExportHandle;
-    colrender(colnames: string | string[], kind: "enum", items: Iterable<[string, number]>): ExportHandle;
-    colrender(colnames: string | string[], kind: "string", opts?: ITxtColRenderOpts): ExportHandle;
-    colrender(colnames: string | string[], kind: "uuid"): ExportHandle;
-    colrender(colnames: string | string[], kind: "boolean"): ExportHandle;
-    colrender(colnames: string | string[], kind: "hex", opts?: IHexColRenderOpts): ExportHandle;
-    colrender(colnames: string | string[], kind: "bitmap", opts?: IBitmapColRenderOpts): ExportHandle;
-    colrender(colnames: string | string[], kind: ColRendererKind, opts?: any): ExportHandle {
+    get variants(): VariantsHandle {
+        return new VariantsHandle(this._opts);
+    }
+}
+
+export class VariantsHandle {
+    /** @internal */
+    private _opts: IExportOpts;
+    /** @internal */
+    constructor(opts: IExportOpts) {
+        this._opts = opts;
+    }
+
+    /** @internal */
+    private colrender(colnames: string | string[], kind: ColRendererKind, opts?: any) {
         let record = {} as Record<string, string>;
         if (opts) {
             switch (kind) {
@@ -156,8 +213,71 @@ export class ExportHandle {
         for (const _col of _cols) {
             this._opts.colrenderers[_col] = { kind, opts: record };
         }
+    }
+
+    datetime(
+        cols: string | string[],
+        opts?: {
+            unit?: "auto" | "sec" | "mills" | "nano";
+            layout?: string;
+            tz?: string;
+        }
+    ): this {
+        this.colrender(cols, "datetime", opts);
         return this;
     }
+
+    enum(cols: string | string[], opts?: Iterable<[string, number]>): this {
+        this.colrender(cols, "enum", opts);
+        return this;
+    }
+
+    string(cols: string | string[], opts?: { encoding?: string; }): this {
+        this.colrender(cols, "string", opts);
+        return this;
+    }
+
+    uuid(col: string | string[]): this {
+        this.colrender(col, "uuid");
+        return this;
+    }
+
+
+    boolean(col: string | string[]): this {
+        this.colrender(col, "boolean");
+        return this;
+    }
+
+    hex(
+        col: string | string[],
+        opts?: {
+            lowercase?: boolean;
+            sep?: string;
+            linewidth?: number;
+        }
+    ): this {
+        this.colrender(col, "hex", opts);
+        return this;
+    }
+
+    bitmap(
+        col: string | string[],
+        opts?: {
+            sep?: string;
+            linewidth?: number;
+        }
+    ): this {
+        this.colrender(col, "bitmap", opts);
+        return this;
+    }
+}
+
+function mustdbctx(): DBContext {
+    const dbctx = Zone.current.get(DBCtxKey) as DBContext | undefined;
+    if (!dbctx) {
+        throw new Error("aghsorm: can not find DBContext in Zone.");
+    }
+    return dbctx;
 }
 
 export class Fragments extends Array<Fragment> {
@@ -168,9 +288,12 @@ export class Fragments extends Array<Fragment> {
     export(opts?: IExportOpts): ExportHandle {
         const _opts = opts || {};
         const handle = new ExportHandle(_opts);
-        const dbctx = Zone.current.get(DBCtxKey) as DBContext | undefined;
-        if (!dbctx) {
-            throw new Error("aghsorm: can not find DBContext in Zone.");
+        const dbctx = mustdbctx();
+
+        const batch = Zone.current.get(BatchKey) as Batch<{ frags: Fragments; opts: IExportOpts }> | undefined;
+        if (batch) {
+            batch.eles.push({ frags: this, opts: _opts });
+            return handle;
         }
         dbctx.register(this, _opts);
         return handle;
