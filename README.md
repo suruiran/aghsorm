@@ -28,22 +28,22 @@ users.delete(
         orderby: ["age"],
         limit: 10,
     }
-).export(dummydbctx);
+).export();
 
  users.update(
-    { age: Op.plus(users.field("age"), 1), created_at: sql`NOW()` },
     Op.gte(users.field("id"), 12).and(
         users.equals({ is_admin: true })
     ),
-).export(dummydbctx);
+    { age: Op.plus(users.field("age"), 1), created_at: sql`NOW()` },
+).export();
 
 users.select(
     Op.gte(users.field("id"), 12).and(
         users.equals({ is_admin: true })
     ),
-).export(dummydbctx);
+).export();
 
 
-sql`select ${11} + ${22} as sum`.export(dummydbctx);
+sql`select ${11} + ${22} as sum`.export();
 
 ```

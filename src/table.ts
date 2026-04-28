@@ -1,7 +1,7 @@
-import { type Fragment, type Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
+import { type Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
-import type { IOpableItems, ITypedOpableItem, Op } from "./op.js";
-import { type DBContext, quotetable, sql, type Value } from "./types.js";
+import { IOpableItems, ITypedOpableItem, Op } from "./op.js";
+import { type DBContext, quotetable, sql, type Value, type Identifier } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 import { type ITableDDL } from "./ddl.js";
 
@@ -15,27 +15,11 @@ export interface ISQLColumn {
     comment: string;
 }
 
-export interface ISQLIndex {
-    name: string;
-    cols?: string[];
-    expr?: string;
-}
-
-type ExtractFromKeys<T, K extends readonly (keyof T & string)[]> = Pick<T, K[number]>;
-type ExtractNoInKeys<T, K extends readonly (keyof T & string)[]> = Omit<T, K[number]>;
-type WithOp<T, Undefinedable extends boolean = false> = {
-    [K in keyof T]: Undefinedable extends true
-    ? ITypedOpableItem<T[K]> | null | undefined
-    : ITypedOpableItem<T[K]> | null;
+type WithOp<T> = {
+    [K in keyof T]: ITypedOpableItem<T[K]> | null | undefined
 };
 
-// prettier-ignore
-type InsertRecord<T, PKS extends readonly (keyof T & string)[]> =
-    WithOp<Required<ExtractFromKeys<T, PKS>>>
-    &
-    WithOp<Partial<ExtractNoInKeys<T, PKS>>, true>;
-
-type PartialRecord<T> = Partial<WithOp<T, true>>;
+type PartialRecord<T> = Partial<WithOp<T>>;
 
 type IOrder<T> =
     | {
@@ -69,14 +53,10 @@ interface ITableOptions<T extends { [K in keyof T & string]: Value }> {
     name: string;
     sqlname?: string;
     fields: ISQLColumn[];
-    indexes: ISQLIndex[];
     ddl: ITableDDL<keyof T & string>;
 }
 
-export class SqlTable<
-    T extends { [K in keyof T & string]: Value },
-    PKS extends readonly (keyof T & string)[]
-> {
+export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     /** @internal */
     private _schema: string;
     /** @internal */
@@ -90,8 +70,6 @@ export class SqlTable<
     private _fields: ISQLColumn[];
     /** @internal */
     private _field_map: Map<string, ISQLColumn> | null;
-    /** @internal */
-    private _indexes: ISQLIndex[];
     /** @internal */
     private _fullname: string;
     /** @internal */
@@ -107,7 +85,6 @@ export class SqlTable<
         this._sqlname = options.sqlname || this._name;
         this._fields = options.fields;
         this._field_map = null;
-        this._indexes = options.indexes;
         this._ddl = options.ddl;
 
         this._fullname = "";
@@ -122,6 +99,14 @@ export class SqlTable<
             return this._field_map.get(key) || null;
         }
         return this._fields.find((f) => f.name === key) || null;
+    }
+
+    private quote_column_name(name: string): string {
+        const fv = this.field_by_name(name as keyof T & string);
+        if (fv) {
+            return this._dbctx.quote(fv.sqlname || name);
+        }
+        return name;
     }
 
     get ddl(): ITableDDL<keyof T & string> {
@@ -143,12 +128,22 @@ export class SqlTable<
         return this._fullname;
     }
 
-    field(key: keyof T & string): Op {
+    column(key: keyof T & string, opts?: { fullname?: boolean }): Identifier {
         const field = this.field_by_name(key);
         if (!field) {
-            return new lazy.Identifier(key).op();
+            throw new Error(`column ${key} not found on table ${this.name}`);
         }
-        return new lazy.Identifier(field.sqlname || key, { dbctx: this._dbctx, table: this.name }).op();
+        return new lazy.Identifier(
+            field.sqlname || key,
+            {
+                table: this.name,
+                fullname: opts?.fullname || false,
+            }
+        );
+    }
+
+    colop(key: keyof T & string, opts?: { fullname?: boolean }): Op {
+        return this.column(key, opts).op();
     }
 
     /** @internal */
@@ -162,11 +157,7 @@ export class SqlTable<
             throw new Error("empty record");
         }
         for (const pair of pairs) {
-            const key = pair[0];
-            const field = this.field_by_name(key as keyof T & string);
-            if (field) {
-                pair[0] = field.sqlname || key;
-            }
+            pair[0] = this.quote_column_name(pair[0]);
         }
         return pairs;
     }
@@ -177,18 +168,27 @@ export class SqlTable<
     }): Op | null {
         let op: Op | null = null;
         for (const [key, value] of Object.entries(record)) {
-            const _op = this.field(key as any).eq(value as IOpableItems | Value);
-            if (op) {
-                op = op.and(_op);
+            let eleop: Op;
+            if (value instanceof Op) {
+                eleop = value;
             } else {
-                op = _op;
+                if (value == null) {
+                    eleop = this.column(key as any).op().isnull();
+                } else {
+                    eleop = this.column(key as any).op().eq(value as IOpableItems | Value);
+                }
+            }
+            if (op) {
+                op = op.and(eleop);
+            } else {
+                op = eleop;
             }
         }
         return op;
     }
 
-    insert(record: InsertRecord<T, PKS>): Fragments {
-        const pairs = this._expand_record(record);
+    insert(record: PartialRecord<T>): Fragments {
+        const pairs = this._expand_record(record as { [k: string]: IOpableItems });
         const tmp = new lazy.Fragments();
         tmp.push(mksqlfrag(`INSERT INTO ${this.fullname}`));
         tmp.push(Frags.parenthesis.left);
@@ -196,7 +196,7 @@ export class SqlTable<
         const size = pairs.length;
         let idx = 0;
         for (const [key] of pairs) {
-            tmp.push(mksqlfrag(this._dbctx.quote(key)));
+            tmp.push(mksqlfrag(this.quote_column_name(key)));
             idx++;
             if (idx < size) {
                 tmp.push(Frags.comma);
@@ -242,19 +242,17 @@ export class SqlTable<
         whereop.tosql(tmp);
     }
 
-
-
     /** @internal */
     private _push_opts(
-        tmp: Fragment[],
+        tmp: Fragments,
         opts?: IOrderOptions<T> &
             ILimitOptions &
             IOffsetOptions &
             IAllowEmptyWhereOptions
     ) {
         if (!opts) return;
-        pushOrders(this._dbctx, tmp, opts);
-        pushLimitOffset(tmp, opts);
+        this.pushOrders(tmp, opts);
+        this.pushLimitOffset(tmp, opts);
     }
 
     delete(
@@ -275,16 +273,16 @@ export class SqlTable<
 
     equals(record: PartialRecord<T>, opts?: { joinkind?: "AND" | "OR" }): Op {
         const pairs = this._expand_record(record as any);
-        const dbctx = this._dbctx;
         const joinkind = opts?.joinkind || "AND";
-        return new lazy.Op("", undefined, undefined, {
+        const self = this;
+        return new lazy.Op("", null, null, {
             fmt(tmp) {
                 tmp.push(Frags.parenthesis.left);
                 const size = pairs.length;
                 let i = 0;
                 for (const [k, v] of pairs) {
                     tmp.push(Frags.parenthesis.left);
-                    tmp.push(mksqlfrag(dbctx.quote(k)));
+                    tmp.push(mksqlfrag(self.quote_column_name(k)));
 
                     if (v == null) {
                         tmp.push(Frags.isnull);
@@ -320,7 +318,7 @@ export class SqlTable<
         const size = pairs.length;
         let idx = 0;
         for (const [k, v] of pairs) {
-            tmp.push(mksqlfrag(this._dbctx.quote(k)));
+            tmp.push(mksqlfrag(this.quote_column_name(k)));
             tmp.push(Frags.equal);
             opItemToSQL(v, tmp);
             idx++;
@@ -334,47 +332,74 @@ export class SqlTable<
     }
 
     /** @internal */
-    private _push_groupby(tmp: Fragments, groupby: string[]) {
+    private _push_groupby(tmp: Fragments, groupby: (string | Op)[]) {
         tmp.push(Frags.groupby);
+        let idx = 0;
+        const size = groupby.length;
         for (const k of groupby) {
-            tmp.push(mksqlfrag(this._dbctx.quote(k)));
+            idx++;
+            if (k instanceof Op) {
+                k.tosql(tmp);
+            } else {
+                tmp.push(mksqlfrag(this.quote_column_name(k)));
+            }
+            if (idx < size) {
+                tmp.push(Frags.comma);
+            }
         }
     }
 
     select(
         where: PartialRecord<T> | Op,
         opts?: {
-            include?: (keyof T & string)[];
+            include?: ((keyof T & string) | Op)[];
             exclude?: (keyof T & string)[];
-            groupby?: (keyof T & string)[];
+            groupby?: ((keyof T & string) | Op)[];
             having?: Op;
         } & IOrderOptions<T> &
             ILimitOptions &
             IOffsetOptions
     ): Fragments {
-        let keys = "*";
+        const tmp = new lazy.Fragments();
+        tmp.push(mksqlfrag(`SELECT`));
+
         if (
             opts &&
             ((opts.include && opts.include.length > 0) ||
                 (opts.exclude && opts.exclude.length > 0))
         ) {
-            let _keys = [] as (keyof T & string)[];
+            let _keys = [] as ((keyof T & string) | Op)[];
             if (opts.include && opts.include.length > 0) {
                 _keys = opts.include;
             } else {
                 _keys = this._fields.map((v) => v.name) as any;
             }
             if (opts.exclude && opts.exclude.length > 0) {
-                _keys = _keys.filter((v) => !opts.exclude!.includes(v));
+                _keys = _keys.filter((v) => {
+                    if (v instanceof Op) return true;
+                    return !opts.exclude!.includes(v);
+                });
             }
             if (_keys.length < 1) {
                 throw new Error("empty keys");
             }
-            _keys = _keys.map((v) => this._dbctx.quote(v)) as any;
-            keys = _keys.join(", ");
+            let idx = 0;
+            const size = _keys.length;
+            for (const ele of _keys) {
+                idx++;
+                if (ele instanceof Op) {
+                    ele.tosql(tmp);
+                } else {
+                    tmp.push(mksqlfrag(this.quote_column_name(ele)));
+                }
+                if (idx < size) {
+                    tmp.push(Frags.comma);
+                }
+            }
+        } else {
+            tmp.push(mksqlfrag("*"));
         }
-        const tmp = new lazy.Fragments();
-        tmp.push(mksqlfrag(`SELECT ${keys} FROM ${this.fullname}`));
+        tmp.push(mksqlfrag(`FROM ${this.fullname}`));
 
         // where 
         this._push_where(tmp, where, { allowemptywhere: true });
@@ -393,39 +418,41 @@ export class SqlTable<
         this._push_opts(tmp, opts);
         return tmp;
     }
+
+    /** @internal */
+    private pushOrders<T>(temp: Fragments, opts?: IOrderOptions<T>) {
+        if (!opts || !opts.orderby) return;
+        temp.push(Frags.orderby);
+        const size = opts.orderby.length;
+        let idx = 0;
+        for (const item of opts.orderby) {
+            if (typeof item === "string") {
+                temp.push(mksqlfrag(this.quote_column_name(item)));
+            } else {
+                temp.push(mksqlfrag(`${this.quote_column_name(item.field)} ${item.direction}`));
+            }
+            idx++;
+            if (idx < size) {
+                temp.push(Frags.comma);
+            }
+        }
+    }
+
+    /** @internal */
+    private pushLimitOffset(
+        temp: Fragments,
+        opts?: ILimitOptions & IOffsetOptions
+    ) {
+        if (!opts) return;
+        if (opts.limit != null) {
+            temp.push(Frags.limit);
+            temp.push(mkvalfrag(opts.limit));
+        }
+        if (opts.offset != null) {
+            temp.push(Frags.offset);
+            temp.push(mkvalfrag(opts.offset));
+        }
+    }
 }
 
 lazy.SqlTable = SqlTable;
-
-export function pushOrders<T>(dbctx: DBContext, temp: Fragment[], opts?: IOrderOptions<T>) {
-    if (!opts || !opts.orderby) return;
-    temp.push(Frags.orderby);
-    const size = opts.orderby.length;
-    let idx = 0;
-    for (const item of opts.orderby) {
-        if (typeof item === "string") {
-            temp.push(mksqlfrag(dbctx.quote(item)));
-        } else {
-            temp.push(mksqlfrag(`${dbctx.quote(item.field)} ${item.direction}`));
-        }
-        idx++;
-        if (idx < size) {
-            temp.push(Frags.comma);
-        }
-    }
-}
-
-export function pushLimitOffset(
-    temp: Fragment[],
-    opts?: ILimitOptions & IOffsetOptions
-) {
-    if (!opts) return;
-    if (opts.limit != null) {
-        temp.push(Frags.limit);
-        temp.push(mkvalfrag(opts.limit));
-    }
-    if (opts.offset != null) {
-        temp.push(Frags.offset);
-        temp.push(mkvalfrag(opts.offset));
-    }
-}

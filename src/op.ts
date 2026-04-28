@@ -1,20 +1,21 @@
-import { type Fragment, Frags, mksqlfrag } from "./frag.js";
+import { Frags, mksqlfrag, type Fragments } from "./frag.js";
 import { lazy } from "./lazy.js";
 import type { SqlTable } from "./table.js";
 import type { Identifier, RawSql, Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
+import { getCtx } from "./ctxvals.js";
 
-export type IOpableItems = Value | Identifier | RawSql | Op | SqlTable<any, any>;
+export type IOpableItems = Value | Identifier | RawSql | Op | SqlTable<any>;
 export type ITypedOpableItem<T> = T | Identifier | RawSql | Op;
 
 type OpToSQLFunc = (
-    tmp: Fragment[],
+    tmp: Fragments,
     left: { val: IOpableItems } | null,
     right: { val: IOpableItems } | null
 ) => void;
 
 function fmtRightsOp(
-    tmp: Fragment[],
+    tmp: Fragments,
     op: string,
     left: IOpableItems | undefined,
     item: IOpableItems,
@@ -68,7 +69,7 @@ export class Op {
         this._bracket = opts?.bracket || false;
     }
 
-    tosql(tmp: Fragment[]) {
+    tosql(tmp: Fragments) {
         if (this._tosql) {
             this._tosql(tmp, this._left, this._right);
             return;
@@ -170,6 +171,9 @@ export class Op {
     }
 
     static in(left: IOpableItems, item: IOpableItems, ...items: IOpableItems[]) {
+        if (items.length < 1) {
+            throw new Error("IN operator must have at least one item");
+        }
         return new Op("", left, null, {
             fmt: (tmp) => {
                 fmtRightsOp(tmp, "IN", left, item, ...items)
@@ -186,6 +190,9 @@ export class Op {
         item: IOpableItems,
         ...items: IOpableItems[]
     ) {
+        if (items.length < 1) {
+            throw new Error("NOT IN operator must have at least one item");
+        }
         return new Op("", left, null, {
             fmt: (tmp) => {
                 fmtRightsOp(tmp, "NOT IN", left, item, ...items);
@@ -328,6 +335,20 @@ export class Op {
                     }
                 }
                 tmp.push(Frags.parenthesis.right);
+                return tmp;
+            },
+        });
+    }
+
+    alias(name: string): Op {
+        return new Op("", this, null, {
+            fmt: (tmp) => {
+                tmp.push(Frags.parenthesis.left);
+                opItemToSQL(this, tmp);
+                tmp.push(Frags.parenthesis.right);
+                tmp.push(mksqlfrag("AS"));
+                const ctx = getCtx();
+                tmp.push(mksqlfrag(ctx ? ctx.quote(name) : name));
                 return tmp;
             },
         });

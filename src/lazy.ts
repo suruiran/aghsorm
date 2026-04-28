@@ -1,7 +1,7 @@
 import type { Op } from "./op.js";
 import type { SqlTable } from "./table.js";
 import type { Identifier, RawSql } from "./types.js";
-import type { Fragments } from "./frag.js";
+import type { Fragments, Batch } from "./frag.js";
 
 export const lazy = {
     SqlTable: {} as any as typeof SqlTable,
@@ -9,6 +9,5 @@ export const lazy = {
     RawSql: {} as any as typeof RawSql,
     Identifier: {} as any as typeof Identifier,
     Fragments: {} as any as typeof Fragments,
+    Batch: {} as any as typeof Batch,
 };
-
-export const DBCtxKey = "aghsorm.dbctx";

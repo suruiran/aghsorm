@@ -1,8 +1,8 @@
-import { type Fragment, mksqlfrag, mkvalfrag } from "./frag.js";
+import { mksqlfrag, mkvalfrag, type Fragments } from "./frag.js";
 import { lazy } from "./lazy.js";
 import type { IOpableItems } from "./op.js";
 
-export function opItemToSQL(item: IOpableItems, temp: Fragment[]) {
+export function opItemToSQL(item: IOpableItems, temp: Fragments) {
     if (item instanceof lazy.Identifier) {
         item.op().tosql(temp)
         return;
@@ -28,5 +28,8 @@ export function opItemToSQL(item: IOpableItems, temp: Fragment[]) {
 
 
 export function QuoteSQLStringLiteral(v: string) {
+    if (v.includes("\\")) {
+        throw new Error("aghsorm: string literal cannot contain backslash");
+    }
     return `'${v.replaceAll("'", "''")}'`;
 }

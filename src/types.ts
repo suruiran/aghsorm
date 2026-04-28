@@ -1,9 +1,9 @@
 import { type IDBDDL } from "./ddl.js";
-import { type ExportHandle, Fragments, type IExportOpts, mksqlfrag, type Batch } from "./frag.js";
-import { DBCtxKey, lazy } from "./lazy.js";
+import { type ExportHandle, type Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
+import { lazy } from "./lazy.js";
 import type { IOpableItems, Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
-import "zone.js";
+import { getCtx } from "./ctxvals.js";
 
 export type Value =
     | string
@@ -19,11 +19,6 @@ export interface DBContext extends IDBDDL {
     register(fragments: Fragments, opts?: IExportOpts): void;
 }
 
-export function runInCtx(name: string, ctx: DBContext, fnc: () => any) {
-    const scope = Zone.current.fork({ name, properties: { [DBCtxKey]: ctx } });
-    return scope.run(fnc);
-}
-
 export function quotetable(dbctx: DBContext, scope: string | null, name: string): string {
     if (scope) {
         return `${dbctx.quote(scope)}.${dbctx.quote(name)}`;
@@ -33,33 +28,41 @@ export function quotetable(dbctx: DBContext, scope: string | null, name: string)
 
 export class Identifier {
     /** @internal */
-    private _dbctx: DBContext | null;
-    /** @internal */
     private _table: string | null;
     /** @internal */
     private _name: string;
+    /** @internal */
+    private _fullname: boolean | null;
 
     constructor(name: string, opts?: {
-        dbctx?: DBContext,
         table?: string,
+        fullname?: boolean,
     }) {
-        this._dbctx = opts?.dbctx || null;
         this._name = name;
+        this._fullname = opts?.fullname || false;
         this._table = opts?.table || null;
     }
+
+    string(opts?: { fullname?: boolean }) {
+        const fullname = opts?.fullname || this._fullname;
+        const ctx = getCtx();
+        if (!ctx) {
+            if (this._table && fullname) {
+                return `${this._table}.${this._name}`;
+            }
+            return this._name;
+        }
+        if (fullname) {
+            return quotetable(ctx, this._table, this._name)
+        }
+        return ctx.quote(this._name);
+    }
+
 
     op(): Op {
         return new lazy.Op("", null, null, {
             fmt: (tmp) => {
-                if (!this._dbctx) {
-                    if (this._table) {
-                        tmp.push(mksqlfrag(`${this._table}.${this._name}`));
-                        return;
-                    }
-                    tmp.push(mksqlfrag(this._name));
-                    return;
-                }
-                tmp.push(mksqlfrag(quotetable(this._dbctx, this._table, this._name)));
+                tmp.push(mksqlfrag(this.string()));
             },
         });
     }
@@ -93,18 +96,18 @@ export class RawSql {
 lazy.RawSql = RawSql;
 
 export function sql(eles: TemplateStringsArray, ...exps: IOpableItems[]): RawSql {
-    const tmp = new Fragments;
+    const tmp = new lazy.Fragments;
     for (let i = 0; i < eles.length; i++) {
         tmp.push(mksqlfrag(eles[i] as string));
         if (i < exps.length) {
-            opItemToSQL(exps[i] as IOpableItems, tmp)
+            opItemToSQL(exps[i] as IOpableItems, tmp);
         }
     }
     return new RawSql(tmp);
 }
 
 export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | number | string | null)[]): Fragments {
-    const tmp = new Fragments;
+    const tmp = new lazy.Fragments;
     for (let i = 0; i < eles.length; i++) {
         tmp.push(mksqlfrag(eles[i] as string));
         if (i < exps.length) {
@@ -113,7 +116,7 @@ export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | number 
                 tmp.push(mksqlfrag("NULL"));
                 continue;
             }
-            if (ele instanceof Fragments) {
+            if (ele instanceof lazy.Fragments) {
                 tmp.push(...ele);
                 continue;
             }

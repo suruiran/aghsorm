@@ -1,5 +1,8 @@
 import { type DBContext, type Value } from "./types.js";
-import { lazy, DBCtxKey } from "./lazy.js";
+import { type Op } from "./op.js";
+
+import { lazy } from "./lazy.js";
+import { getBatch, getCtx } from "./ctxvals.js";
 
 export interface Fragment {
     sql?: string;
@@ -72,32 +75,7 @@ export class Batch<T> {
     }
 }
 
-const BatchKey = "aghsorm.batch";
-const AddBatchKey = "aghsorm.addbatch";
-
-type AddBatch<T> = (batch: Batch<T>) => void;
-
-export function runInAddBatch<T>(name: string, add: AddBatch<T>, fnc: () => any) {
-    const scope = Zone.current.fork({ name, properties: { [AddBatchKey]: add } });
-    return scope.run(fnc);
-}
-
-export function batch<T>(name: string, fnc: () => T) {
-    const cb = Zone.current.get(BatchKey);
-    if (cb) {
-        throw new Error(`aghsorm: You are already in a batch scope, ${cb.name}`);
-    }
-    const batch = new Batch<T>(name);
-    const addbatch = Zone.current.get(AddBatchKey) as AddBatch<T> | undefined;
-    if (!addbatch) {
-        throw new Error(`aghsorm: You are not in a batch scope.`);
-    }
-    addbatch(batch);
-    const scope = Zone.current.fork({ name: `zoneof: batch ${name}`, properties: { [BatchKey]: batch } });
-    batch._fnc = () => {
-        return scope.run(fnc);
-    }
-}
+lazy.Batch = Batch;
 
 export interface IExportOpts {
     label?: string;
@@ -273,16 +251,29 @@ export class VariantsHandle {
 }
 
 function mustdbctx(): DBContext {
-    const dbctx = Zone.current.get(DBCtxKey) as DBContext | undefined;
+    const dbctx = getCtx();
     if (!dbctx) {
         throw new Error("aghsorm: can not find DBContext in Zone.");
     }
     return dbctx;
 }
 
-export class Fragments extends Array<Fragment> {
+export class Fragments {
+    /** @internal */
+    _items: Fragment[];
+
     constructor() {
-        super();
+        this._items = [];
+    }
+
+    *[Symbol.iterator]() {
+        for (const element of this._items) {
+            yield element;
+        }
+    }
+
+    get length(): number {
+        return this._items.length;
     }
 
     export(opts?: IExportOpts): ExportHandle {
@@ -290,7 +281,7 @@ export class Fragments extends Array<Fragment> {
         const handle = new ExportHandle(_opts);
         const dbctx = mustdbctx();
 
-        const batch = Zone.current.get(BatchKey) as Batch<{ frags: Fragments; opts: IExportOpts }> | undefined;
+        const batch = getBatch<{ frags: Fragments; opts: IExportOpts }>();
         if (batch) {
             batch.eles.push({ frags: this, opts: _opts });
             return handle;
@@ -305,7 +296,13 @@ export class Fragments extends Array<Fragment> {
                 throw new Error(`${ele} is not a fragment.`);
             }
         }
-        return super.push(...items);
+        return this._items.push(...items);
+    }
+
+    op(): Op {
+        return new lazy.Op("", null, null, {
+            fmt: (tmp) => tmp.push(...this),
+        });
     }
 }
 
