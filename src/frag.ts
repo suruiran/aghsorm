@@ -55,6 +55,7 @@ export interface IColRendererOpts {
 export class Batch<T> {
     name: string;
     eles: T[];
+    pagesize?: number;
 
     /** @internal */
     _fnc!: () => any;
@@ -62,9 +63,10 @@ export class Batch<T> {
     #execed: boolean;
 
     /** @internal */
-    constructor(name: string) {
+    constructor(name: string, opts?: { pagesize?: number }) {
         this.name = name;
         this.eles = [];
+        this.pagesize = opts?.pagesize as number;
         this.#execed = false;
     }
 
@@ -281,9 +283,9 @@ export class Fragments {
         const handle = new ExportHandle(_opts);
         const dbctx = mustdbctx();
 
-        const batch = getBatch<{ frags: Fragments; opts: IExportOpts }>();
+        const batch = getBatch<Fragments>();
         if (batch) {
-            batch.eles.push({ frags: this, opts: _opts });
+            batch.eles.push(this);
             return handle;
         }
         dbctx.register(this, _opts);

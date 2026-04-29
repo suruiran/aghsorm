@@ -16,12 +16,12 @@ export function runInAddBatch<T>(name: string, add: AddBatch<T>, fnc: () => any)
     return scope.run(fnc);
 }
 
-export function batch<T>(name: string, fnc: () => T) {
+export function batch<T>(name: string, fnc: () => any, opts?: { pagesize?: number }) {
     const cb = Zone.current.get(BatchKey);
     if (cb) {
         throw new Error(`aghsorm: you are already in a batch scope, ${cb.name}`);
     }
-    const batch = new lazy.Batch<T>(name);
+    const batch = new lazy.Batch<T>(name, opts);
     const addbatch = Zone.current.get(AddBatchKey) as AddBatch<T> | undefined;
     if (!addbatch) {
         throw new Error(`aghsorm: you are not in a batch scope.`);
