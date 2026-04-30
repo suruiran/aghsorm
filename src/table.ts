@@ -1,9 +1,10 @@
 import { type Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
 import { IOpableItems, ITypedOpableItem, Op } from "./op.js";
-import { type DBContext, quotetable, sql, type Value, type Identifier } from "./types.js";
+import { quotetable, sql, type Value, type Identifier } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 import { type ITableDDL } from "./ddl.js";
+import { mustdbctx } from "./ctxvals.js";
 
 export interface ISQLColumn {
     name: string;
@@ -47,7 +48,6 @@ interface IAllowEmptyWhereOptions {
 }
 
 interface ITableOptions<T extends { [K in keyof T & string]: Value }> {
-    dbctx: DBContext;
     schema: string;
     sqlschema?: string;
     name: string;
@@ -73,12 +73,9 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     /** @internal */
     private _fullname: string;
     /** @internal */
-    private _dbctx: DBContext;
-    /** @internal */
     private _ddl: ITableDDL<keyof T & string>;
 
     constructor(options: ITableOptions<T>) {
-        this._dbctx = options.dbctx;
         this._schema = options.schema;
         this._sqlschema = options.sqlschema || this._schema;
         this._name = options.name;
@@ -104,7 +101,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     private quote_column_name(name: string): string {
         const fv = this.field_by_name(name as keyof T & string);
         if (fv) {
-            return this._dbctx.quote(fv.sqlname || name);
+            return mustdbctx().quote(fv.sqlname || name);
         }
         return name;
     }
@@ -123,7 +120,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
 
     get fullname(): string {
         if (!this._fullname) {
-            this._fullname = quotetable(this._dbctx, this.schema, this.name);
+            this._fullname = quotetable(mustdbctx(), this.schema, this.name);
         }
         return this._fullname;
     }

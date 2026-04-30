@@ -1,8 +1,8 @@
-import { type DBContext, type Value } from "./types.js";
+import { type Value } from "./types.js";
 import { type Op } from "./op.js";
 
 import { lazy } from "./lazy.js";
-import { getCtx } from "./ctxvals.js";
+import { mustdbctx } from "./ctxvals.js";
 
 export interface Fragment {
     sql?: string;
@@ -223,14 +223,6 @@ export class VariantsHandle {
         this.colrender(col, "bitmap", opts);
         return this;
     }
-}
-
-function mustdbctx(): DBContext {
-    const dbctx = getCtx();
-    if (!dbctx) {
-        throw new Error("aghsorm: can not find DBContext in Zone.");
-    }
-    return dbctx;
 }
 
 export class Fragments {
