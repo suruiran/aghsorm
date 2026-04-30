@@ -2,7 +2,7 @@ import { type DBContext, type Value } from "./types.js";
 import { type Op } from "./op.js";
 
 import { lazy } from "./lazy.js";
-import { getBatch, getCtx } from "./ctxvals.js";
+import { getCtx } from "./ctxvals.js";
 
 export interface Fragment {
     sql?: string;
@@ -12,7 +12,7 @@ export interface Fragment {
 const fragsymbol = Symbol.for("frag");
 
 function mark(v: Fragment): Fragment {
-    Object.defineProperty(v, fragsymbol, { value: true, configurable: false, writable: false, enumerable: false })
+    Object.defineProperty(v, fragsymbol, { value: true, configurable: false, writable: false, enumerable: false });
     return v;
 }
 
@@ -25,7 +25,7 @@ export function mkvalfrag(v: Value): Fragment {
 }
 
 export function isfrag(obj: any): boolean {
-    return Reflect.get(obj, fragsymbol) || false;
+    return Reflect.get(obj, fragsymbol) === true;
 }
 
 export const Frags = {
@@ -51,33 +51,6 @@ export interface IColRendererOpts {
     kind: ColRendererKind;
     opts?: Record<string, string>;
 }
-
-export class Batch<T> {
-    name: string;
-    eles: T[];
-    pagesize?: number;
-
-    /** @internal */
-    _fnc!: () => any;
-    /** @internal */
-    #execed: boolean;
-
-    /** @internal */
-    constructor(name: string, opts?: { pagesize?: number }) {
-        this.name = name;
-        this.eles = [];
-        this.pagesize = opts?.pagesize as number;
-        this.#execed = false;
-    }
-
-    exec() {
-        if (this.#execed) return;
-        this.#execed = true;
-        return this._fnc();
-    }
-}
-
-lazy.Batch = Batch;
 
 export interface IExportOpts {
     label?: string;
@@ -282,12 +255,6 @@ export class Fragments {
         const _opts = opts || {};
         const handle = new ExportHandle(_opts);
         const dbctx = mustdbctx();
-
-        const batch = getBatch<Fragments>();
-        if (batch) {
-            batch.eles.push(this);
-            return handle;
-        }
         dbctx.register(this, _opts);
         return handle;
     }
