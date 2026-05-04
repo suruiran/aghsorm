@@ -101,7 +101,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     private quote_column_name(name: string): string {
         const fv = this.field_by_name(name as keyof T & string);
         if (fv) {
-            return mustdbctx().quote(fv.sqlname || name);
+            return mustdbctx().quote("id", fv.sqlname || name);
         }
         return name;
     }
@@ -193,7 +193,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
         const size = pairs.length;
         let idx = 0;
         for (const [key] of pairs) {
-            tmp.push(mksqlfrag(this.quote_column_name(key)));
+            tmp.push(mksqlfrag(key));
             idx++;
             if (idx < size) {
                 tmp.push(Frags.comma);
@@ -271,7 +271,6 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     equals(record: PartialRecord<T>, opts?: { joinkind?: "AND" | "OR" }): Op {
         const pairs = this._expand_record(record as any);
         const joinkind = opts?.joinkind || "AND";
-        const self = this;
         return new lazy.Op("", null, null, {
             fmt(tmp) {
                 tmp.push(Frags.parenthesis.left);
@@ -279,7 +278,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
                 let i = 0;
                 for (const [k, v] of pairs) {
                     tmp.push(Frags.parenthesis.left);
-                    tmp.push(mksqlfrag(self.quote_column_name(k)));
+                    tmp.push(mksqlfrag(k));
 
                     if (v == null) {
                         tmp.push(Frags.isnull);
@@ -315,7 +314,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
         const size = pairs.length;
         let idx = 0;
         for (const [k, v] of pairs) {
-            tmp.push(mksqlfrag(this.quote_column_name(k)));
+            tmp.push(mksqlfrag(k));
             tmp.push(Frags.equal);
             opItemToSQL(v, tmp);
             idx++;

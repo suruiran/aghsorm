@@ -1,9 +1,13 @@
+import { DBCtxKey } from "./ctxvals.js";
 import { Fragments } from "./frag.js";
 import type { DBContext, Value } from "./types.js";
 
 export const dummydbctx: DBContext = {
-    quote: function (name: string): string {
-        return `\`${name}\``;
+    quote(usecase: "id" | "stringliteral", name: string): string {
+        if (usecase === "id") {
+            return `\`${name}\``;
+        }
+        return `'${name.replace(/'/g, "''")}'`;
     },
     register: function (fragments: Fragments) {
         const tmp = [] as string[];
@@ -22,3 +26,8 @@ export const dummydbctx: DBContext = {
         return new Fragments();
     },
 };
+
+export function runInCtx(name: string, ctx: DBContext, fnc: () => any) {
+    const scope = Zone.current.fork({ name, properties: { [DBCtxKey]: ctx } });
+    return scope.run(fnc);
+}

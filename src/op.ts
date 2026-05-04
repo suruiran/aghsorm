@@ -41,6 +41,34 @@ function fmtRightsOp(
     }
 }
 
+
+function join(
+    tmp: Fragments,
+    items: IOpableItems[],
+    opts: {
+        sep: string;
+        begin: string;
+        end: string;
+        allowempty?: boolean;
+    }
+) {
+    if (items.length === 0 && !opts.allowempty) {
+        throw new Error("aghsorm.join: items is empty");
+    }
+    tmp.push(mksqlfrag(opts.begin));
+    const sepfrag = mksqlfrag(opts.sep);
+    const size = items.length;
+    let i = 0;
+    for (const ele of items) {
+        opItemToSQL(ele, tmp);
+        i++;
+        if (i < size) {
+            tmp.push(sepfrag);
+        }
+    }
+    tmp.push(mksqlfrag(opts.end));
+}
+
 export class Op {
     /** @internal */
     private _opkind: string;
@@ -74,7 +102,6 @@ export class Op {
             this._tosql(tmp, this._left, this._right);
             return;
         }
-
         if (this._left != null) {
             if (this._bracket) tmp.push(Frags.parenthesis.left);
             opItemToSQL(this._left.val, tmp);
@@ -88,16 +115,27 @@ export class Op {
         }
     }
 
-    static and(left: IOpableItems | undefined, right: IOpableItems | undefined) {
-        return new Op("AND", left, right, { bracket: true });
+    static and(item: IOpableItems, ...items: IOpableItems[]) {
+        return new Op("AND", null, null, {
+            fmt: (tmp) => {
+                join(tmp, [item, ...items], { sep: "AND", begin: "(", end: ")" });
+            }
+        });
     }
 
     and(right: IOpableItems): Op {
         return Op.and(this, right);
     }
 
-    static or(left: IOpableItems | undefined, right: IOpableItems | undefined) {
-        return new Op("OR", left, right, { bracket: true });
+    static or(item: IOpableItems, ...items: IOpableItems[]) {
+        if (items.length < 1) {
+            throw new Error("OR must have at least one item");
+        }
+        return new Op("OR", null, null, {
+            fmt: (tmp) => {
+                join(tmp, [item, ...items], { sep: "OR", begin: "(", end: ")" });
+            }
+        });
     }
 
     or(right: IOpableItems): Op {
@@ -105,7 +143,7 @@ export class Op {
     }
 
     not(): Op {
-        return new Op("NOT", null, this, { bracket: true });
+        return new Op("NOT", undefined, this, { bracket: true });
     }
 
     static eq(left: IOpableItems | undefined, right: IOpableItems | undefined) {
@@ -229,7 +267,7 @@ export class Op {
     }
 
     isnull(): Op {
-        return new Op("IS NULL", this, null);
+        return new Op("IS NULL", this, undefined);
     }
 
     static plus(
@@ -332,6 +370,7 @@ export class Op {
                     default: {
                         const [fa, ...rest] = args;
                         fmtRightsOp(tmp, "", undefined, fa!, ...rest);
+                        break;
                     }
                 }
                 tmp.push(Frags.parenthesis.right);
@@ -348,7 +387,7 @@ export class Op {
                 tmp.push(Frags.parenthesis.right);
                 tmp.push(mksqlfrag("AS"));
                 const ctx = getCtx();
-                tmp.push(mksqlfrag(ctx ? ctx.quote(name) : name));
+                tmp.push(mksqlfrag(ctx ? ctx.quote("id", name) : name));
                 return tmp;
             },
         });

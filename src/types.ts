@@ -15,15 +15,15 @@ export type Value =
     | null;
 
 export interface DBContext extends IDBDDL {
-    quote(id: string): string;
+    quote(kind: "id" | "stringliteral", txt: string): string;
     register(fragments: Fragments, opts?: IExportOpts): void;
 }
 
 export function quotetable(dbctx: DBContext, scope: string | null, name: string): string {
     if (scope) {
-        return `${dbctx.quote(scope)}.${dbctx.quote(name)}`;
+        return `${dbctx.quote("id", scope)}.${dbctx.quote("id", name)}`;
     }
-    return dbctx.quote(name);
+    return dbctx.quote("id", name);
 }
 
 export class Identifier {
@@ -55,7 +55,7 @@ export class Identifier {
         if (fullname) {
             return quotetable(ctx, this._table, this._name)
         }
-        return ctx.quote(this._name);
+        return ctx.quote("id", this._name);
     }
 
 
