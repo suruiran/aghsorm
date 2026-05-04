@@ -164,9 +164,11 @@ test("groupby and having", () => {
 
         const where = amountCol.gt(0);
 
+        const totalAmount = table.fakecol("total_amount");
+
         const include = [
             nameCol.alias("user_name"),
-            Op.call("SUM", amountCol).alias("total_amount"),
+            Op.call("SUM", amountCol).alias(totalAmount),
             Op.call("AVG", amountCol).alias("avg_amount"),
             Op.call("COUNT", idCol).alias("user_count"),
         ];
@@ -180,7 +182,7 @@ test("groupby and having", () => {
             include,
             groupby: ["name"],
             having,
-            orderby: [{ field: "total_amount" as any as keyof IUserModel, direction: "DESC" }],
+            orderby: [{ field: totalAmount, direction: "DESC" }],
             limit: 50,
         }).export();
     });

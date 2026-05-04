@@ -143,6 +143,10 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
         return this.column(key, opts).op();
     }
 
+    fakecol(name: string): keyof T & string {
+        return name as keyof T & string;
+    }
+
     /** @internal */
     private _expand_record(record: {
         [k: string]: IOpableItems;
