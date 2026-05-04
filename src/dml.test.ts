@@ -1,6 +1,7 @@
 import { Op, SqlTable, rawsql } from "./index.js";
 import { dummydbctx, runInCtx } from "./dummy.js";
 import { test } from "vitest";
+import { ColOp } from "./op.js";
 
 interface IUserModel {
     id: number;
@@ -63,7 +64,7 @@ test("update", () => {
     runInCtx("", dummydbctx, () => {
         table.update(
             {
-                id: table.colop("id").lte(1),
+                id: ColOp.lte(1),
             },
             {
                 id: 1,
@@ -184,6 +185,14 @@ test("groupby and having", () => {
             having,
             orderby: [{ field: totalAmount, direction: "DESC" }],
             limit: 50,
+        }).export();
+    });
+});
+
+test("colop", () => {
+    runInCtx("", dummydbctx, () => {
+        table.select({
+            id: ColOp.lte(1)
         }).export();
     });
 });

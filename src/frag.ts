@@ -261,7 +261,7 @@ export class Fragments {
     }
 
     op(): Op {
-        return new lazy.Op("", null, null, {
+        return new lazy.Op("FRAGMENTS", undefined, undefined, {
             fmt: (tmp) => tmp.push(...this),
         });
     }

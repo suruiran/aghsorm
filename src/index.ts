@@ -1,4 +1,4 @@
-export { Op } from "./op.js";
+export { Op, ColOp } from "./op.js";
 export { SqlTable } from "./table.js";
 export { sql, rawsql, type DBContext } from "./types.js";
 export {

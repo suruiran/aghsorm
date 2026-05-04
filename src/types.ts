@@ -60,7 +60,7 @@ export class Identifier {
 
 
     op(): Op {
-        return new lazy.Op("", null, null, {
+        return new lazy.Op("IDENTIFIER", undefined, undefined, {
             fmt: (tmp) => {
                 tmp.push(mksqlfrag(this.string()));
             },
@@ -79,7 +79,7 @@ export class RawSql {
     }
 
     op(): Op {
-        return new lazy.Op("", null, null, {
+        return new lazy.Op("RAWSQL", undefined, undefined, {
             fmt: (tmp) => tmp.push(...this._frags),
         });
     }

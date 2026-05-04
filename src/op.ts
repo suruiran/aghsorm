@@ -18,8 +18,7 @@ function fmtRightsOp(
     tmp: Fragments,
     op: string,
     left: IOpableItems | undefined,
-    item: IOpableItems,
-    ...items: IOpableItems[]
+    items: IOpableItems[]
 ) {
     if (typeof left !== "undefined") {
         opItemToSQL(left, tmp);
@@ -28,10 +27,9 @@ function fmtRightsOp(
         tmp.push(mksqlfrag(`${op} (`));
     }
 
-    const eles = [item, ...items];
-    for (let i = 0; i < eles.length; i++) {
-        opItemToSQL(eles[i]!, tmp);
-        if (i < eles.length - 1) {
+    for (let i = 0; i < items.length; i++) {
+        opItemToSQL(items[i]!, tmp);
+        if (i < items.length - 1) {
             tmp.push(Frags.comma);
         }
     }
@@ -69,6 +67,30 @@ function join(
     tmp.push(mksqlfrag(opts.end));
 }
 
+function updatelocal(local: any, val: any, ws?: WeakSet<any>) {
+    if (!local) return;
+    if (typeof local !== "object") return;
+
+    if (ws && ws.has(local)) {
+        return;
+    }
+    ws?.add(local);
+
+    if (local instanceof Op) {
+        local.__updatecol(val);
+        return;
+    }
+    if (Array.isArray(local)) {
+        for (const ele of local) {
+            updatelocal(ele, val, ws);
+        }
+        return;
+    }
+    for (const ele of Object.values(local)) {
+        updatelocal(ele, val, ws);
+    }
+}
+
 export class Op {
     /** @internal */
     private _opkind: string;
@@ -80,6 +102,12 @@ export class Op {
     private _tosql: OpToSQLFunc | null;
     /** @internal */
     private _bracket: boolean;
+    /** @internal */
+    private _iscol: {
+        val: string;
+    } | null;
+    /** @internal */
+    private _local: any;
 
     constructor(
         opkind: string,
@@ -88,6 +116,12 @@ export class Op {
         opts?: {
             fmt?: OpToSQLFunc | null;
             bracket?: boolean;
+            /** @internal */
+            _iscol?: {
+                val: string;
+            };
+            /** @internal */
+            _local?: any;
         }
     ) {
         this._opkind = opkind;
@@ -95,9 +129,19 @@ export class Op {
         this._right = typeof right !== "undefined" ? { val: right } : null;
         this._tosql = opts?.fmt || null;
         this._bracket = opts?.bracket || false;
+        this._iscol = opts?._iscol || null;
+        this._local = opts?._local || null;
     }
 
     tosql(tmp: Fragments) {
+        if (this._iscol != null) {
+            if (!this._iscol.val) {
+                throw new Error(`aghsorm.ColOp: column name is empty`);
+            }
+            tmp.push(mksqlfrag(this._iscol.val));
+            return;
+        }
+
         if (this._tosql) {
             this._tosql(tmp, this._left, this._right);
             return;
@@ -115,26 +159,50 @@ export class Op {
         }
     }
 
-    static and(item: IOpableItems, ...items: IOpableItems[]) {
-        return new Op("AND", null, null, {
-            fmt: (tmp) => {
-                join(tmp, [item, ...items], { sep: "AND", begin: "(", end: ")" });
+    /** @internal */
+    __updatecol(val: string) {
+        if (this._iscol != null) {
+            if (this._iscol.val && this._iscol.val !== val) {
+                throw new Error(`aghsorm.ColOp: can not be reused, Please use a factory function to do that.`);
             }
+            this._iscol.val = val;
+        }
+        if (this._left != null && this._left.val instanceof Op) {
+            this._left.val.__updatecol(val);
+        }
+        if (this._right != null && this._right.val instanceof Op) {
+            this._right.val.__updatecol(val);
+        }
+        updatelocal(this._local, val, new WeakSet());
+    }
+
+    static and(...items: IOpableItems[]) {
+        if (items.length === 0) {
+            throw new Error("aghsorm.Op.AND: items is empty");
+        }
+        const local = items;
+        return new Op("AND", undefined, undefined, {
+            fmt: (tmp) => {
+                join(tmp, local, { sep: "AND", begin: "(", end: ")" });
+            },
+            _local: local,
         });
     }
 
-    and(right: IOpableItems): Op {
-        return Op.and(this, right);
+    and(...items: IOpableItems[]): Op {
+        return Op.and(this, ...items);
     }
 
-    static or(item: IOpableItems, ...items: IOpableItems[]) {
-        if (items.length < 1) {
-            throw new Error("OR must have at least one item");
+    static or(...items: IOpableItems[]) {
+        if (items.length === 0) {
+            throw new Error("aghsorm.Op.OR: items is empty");
         }
-        return new Op("OR", null, null, {
+        const local = items;
+        return new Op("OR", undefined, undefined, {
             fmt: (tmp) => {
-                join(tmp, [item, ...items], { sep: "OR", begin: "(", end: ")" });
-            }
+                join(tmp, local, { sep: "OR", begin: "(", end: ")" });
+            },
+            _local: local,
         });
     }
 
@@ -195,12 +263,14 @@ export class Op {
     }
 
     static bracket(item: IOpableItems): Op {
-        return new Op("", item, null, {
+        const local = item;
+        return new Op("", undefined, undefined, {
             fmt: (tmp) => {
                 tmp.push(Frags.parenthesis.left)
-                opItemToSQL(item, tmp);
+                opItemToSQL(local, tmp);
                 tmp.push(Frags.parenthesis.right);
             },
+            _local: local,
         });
     }
 
@@ -208,49 +278,51 @@ export class Op {
         return Op.bracket(this);
     }
 
-    static in(left: IOpableItems, item: IOpableItems, ...items: IOpableItems[]) {
+    static in(left: IOpableItems, ...items: IOpableItems[]) {
         if (items.length < 1) {
-            throw new Error("IN operator must have at least one item");
+            throw new Error("aghsorm.Op.IN: items is empty");
         }
-        return new Op("", left, null, {
+        const local = { left, items };
+        return new Op("IN", undefined, undefined, {
             fmt: (tmp) => {
-                fmtRightsOp(tmp, "IN", left, item, ...items)
+                fmtRightsOp(tmp, "IN", local.left, local.items);
             },
+            _local: local,
         });
     }
 
-    in(item: IOpableItems, ...items: IOpableItems[]) {
-        return Op.in(this, item, ...items);
+    in(...items: IOpableItems[]): Op {
+        return Op.in(this, ...items);
     }
 
-    static notin(
-        left: IOpableItems,
-        item: IOpableItems,
-        ...items: IOpableItems[]
-    ) {
+    static notin(left: IOpableItems, ...items: IOpableItems[]) {
         if (items.length < 1) {
-            throw new Error("NOT IN operator must have at least one item");
+            throw new Error("aghsorm.Op.NOTIN: items is empty");
         }
-        return new Op("", left, null, {
+        const local = { left, items };
+        return new Op("", undefined, undefined, {
             fmt: (tmp) => {
-                fmtRightsOp(tmp, "NOT IN", left, item, ...items);
+                fmtRightsOp(tmp, "NOT IN", local.left, local.items);
             },
+            _local: local,
         });
     }
 
-    notin(item: IOpableItems, ...items: IOpableItems[]) {
-        return Op.notin(this, item, ...items);
+    notin(...items: IOpableItems[]): Op {
+        return Op.notin(this, ...items);
     }
 
     static between(left: IOpableItems, begin: IOpableItems, end: IOpableItems) {
-        return new Op("", left, null, {
+        const local = { left, begin, end };
+        return new Op("BETWEEN", undefined, undefined, {
             fmt: (tmp) => {
-                opItemToSQL(left, tmp);
+                opItemToSQL(local.left, tmp);
                 tmp.push(Frags.between);
-                opItemToSQL(begin, tmp);
+                opItemToSQL(local.begin, tmp);
                 tmp.push(Frags.and);
-                opItemToSQL(end, tmp);
+                opItemToSQL(local.end, tmp);
             },
+            _local: local,
         });
     }
 
@@ -359,28 +431,29 @@ export class Op {
     }
 
     static call(funcname: string, ...args: IOpableItems[]) {
-        return new Op("", null, null, {
+        const local = args;
+        return new Op("CALL", undefined, undefined, {
             fmt: (tmp) => {
                 tmp.push(mksqlfrag(funcname));
                 tmp.push(Frags.parenthesis.left);
-                switch (args.length) {
+                switch (local.length) {
                     case 0: {
                         break;
                     }
                     default: {
-                        const [fa, ...rest] = args;
-                        fmtRightsOp(tmp, "", undefined, fa!, ...rest);
+                        fmtRightsOp(tmp, "", undefined, local);
                         break;
                     }
                 }
                 tmp.push(Frags.parenthesis.right);
                 return tmp;
             },
+            _local: local,
         });
     }
 
     alias(name: string): Op {
-        return new Op("", this, null, {
+        return new Op("AS", this, undefined, {
             fmt: (tmp) => {
                 tmp.push(Frags.parenthesis.left);
                 opItemToSQL(this, tmp);
@@ -395,3 +468,12 @@ export class Op {
 }
 
 lazy.Op = Op;
+
+export const ColOp = new Proxy<Op>({} as any, {
+    get(_target, prop) {
+        if (typeof prop !== "string" || !(prop in Op.prototype)) return undefined;
+        const colop = new Op("COL PLACEHOLDER", undefined, undefined, { _iscol: { val: "" } });
+        const fnc = Reflect.get(colop, prop, colop) as () => void;
+        return fnc.bind(colop);
+    },
+});

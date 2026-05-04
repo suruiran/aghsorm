@@ -171,6 +171,8 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
         for (const [key, value] of Object.entries(record)) {
             let eleop: Op;
             if (value instanceof Op) {
+                const col = this.field_by_name(key as keyof T & string);
+                value.__updatecol(mustdbctx().quote("id", col?.sqlname || key));
                 eleop = value;
             } else {
                 if (value == null) {
@@ -275,7 +277,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     equals(record: PartialRecord<T>, opts?: { joinkind?: "AND" | "OR" }): Op {
         const pairs = this._expand_record(record as any);
         const joinkind = opts?.joinkind || "AND";
-        return new lazy.Op("", null, null, {
+        return new lazy.Op("TABLE.EQUALS", undefined, undefined, {
             fmt(tmp) {
                 tmp.push(Frags.parenthesis.left);
                 const size = pairs.length;
