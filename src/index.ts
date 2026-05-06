@@ -10,6 +10,7 @@ export {
     renderddl,
 } from "./ddl.js";
 export { QuoteSQLStringLiteral } from "./utils.js";
+export { DBCtxKey } from "./ctxvals.js";
 
 export { SqliteDialect } from "./ddl.sqlite.js";
 export { MysqlDialect } from "./ddl.mysql.js";
