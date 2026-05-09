@@ -15,8 +15,7 @@ interface User {
     created_at: Date;
 }
 
-const users = new SqlTable<User, ["id"]>({
-    dbctx: dummydbctx,
+const users = new SqlTable<User>({
     schema: "public",
     name: "user",
     fields: [...],

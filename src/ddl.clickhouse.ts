@@ -11,11 +11,22 @@ export class ClickhouseDialect {
         comment?: string;
         cluster?: string;
         orderBy?: Fragments;
+        check?: {
+            name: string;
+            frags: Fragments;
+        };
+        assume?: {
+            name: string;
+            frags: Fragments;
+        }
     }): Record<string, any> {
         return { ...opts };
     }
 
     static colopts(opts: IDDLColOpts, extra?: {
+        materialized?: Fragments;
+        ephemeral?: Fragments;
+        alias?: Fragments;
         ttl?: Fragments;
         compress?: string;
     }): Record<string, any> {
@@ -75,7 +86,7 @@ export class ClickhouseDialect {
             let val = "DateTime64";
             const precision = opts?.precision ?? 3;
             if (opts?.tz) {
-                val = `${val}(${precision}, ${QuoteSQLStringLiteral(opts.tz)})`;
+                return `${val}(${precision}, ${QuoteSQLStringLiteral(opts.tz)})`;
             }
             return `${val}(${precision})`;
         },
