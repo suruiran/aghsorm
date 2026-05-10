@@ -1,6 +1,8 @@
 import { ColOptsBuilder, OptsBuild } from "./builder.js";
+import { mustdbctx } from "./ctxvals.js";
 import { IDDLColOpts } from "./ddl.js";
-import { Fragments } from "./frag.js";
+import { Fragments, mksqlfrag } from "./frag.js";
+import { rawsql } from "./types.js";
 
 export class DuckdbDialect {
     static tableopts(opts?: {
@@ -80,6 +82,20 @@ export class DuckdbDialect {
         map: (key: string, val: string) => {
             return `map(${key}, ${val})`;
         }
+    }
+
+    static createseq(name: string, opts?: {
+        start?: number | bigint;
+        incr?: number | bigint;
+        maxval: number | bigint;
+        cycle?: boolean;
+    }): Fragments {
+        const start = opts?.start ? opts?.start : 1;
+        const incr = opts?.incr ? opts.incr : 1;
+        const tmp = rawsql`CREATE SEQUENCE ${mustdbctx().quote("id", name)} START WITH ${start} INCREMENT BY ${incr}`;
+        if (opts?.maxval) tmp.push(...rawsql`MAXVALUE ${opts.maxval}`);
+        if (opts?.cycle) tmp.push(mksqlfrag(`CYCLE`));
+        return tmp;
     }
 }
 

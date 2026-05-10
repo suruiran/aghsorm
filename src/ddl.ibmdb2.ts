@@ -39,13 +39,22 @@ export class Ibmdb2Dialect {
         return { ...opts };
     }
 
-
     static colopts(
         opts: IDDLColOpts,
         extra?: {
-            as?: Fragments;
+            as?: {
+                expr: Fragments;
+            } | {
+                start?: number | bigint;
+                incr?: number | bigint;
+                min?: number | bigint;
+                max?: number | bigint;
+                cycle?: boolean;
+                cache?: number;
+                order?: boolean;
+            };
             fieldproc?: string;
-            asSecurityLabel?: string;
+            asSecurityLabel?: boolean;
             implicitlyHidden?: boolean;
             inlineLength?: number;
             check?: Fragments;

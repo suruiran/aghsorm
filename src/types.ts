@@ -106,7 +106,7 @@ export function sql(eles: TemplateStringsArray, ...exps: IOpableItems[]): RawSql
     return new RawSql(tmp);
 }
 
-export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | number | string | null)[]): Fragments {
+export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | bigint | number | string | null)[]): Fragments {
     const tmp = new lazy.Fragments;
     for (let i = 0; i < eles.length; i++) {
         tmp.push(mksqlfrag(eles[i] as string));
