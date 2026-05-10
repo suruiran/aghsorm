@@ -19,7 +19,7 @@ export interface IDDLCol {
 
 export interface ITableDDL<K> {
     addcol(col: IDDLCol): Fragments;
-    modcoltype(from: K, to: string): Fragments;
+    modcoltype(from: K, sqltype: string): Fragments;
     renamecol(from: K, to: string): Fragments;
     dropcol(name: K): Fragments;
 

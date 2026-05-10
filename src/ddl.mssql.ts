@@ -77,14 +77,14 @@ export class MssqlDialect {
         datetimeoffset: time("DATETIMEOFFSET"),
         smalldatetime: () => "smalldatetime",
         char: lentype("char"),
-        varchar: lentype("varchar"),
+        varchar: maxlentype("varchar"),
         text: () => "text",
         image: () => "image",
         binary: lentype("binary"),
         varbinary: lentype("varbinary"),
         json: () => "json",
         nchar: lentype("nchar"),
-        nvarchar: lentype("nvarchar"),
+        nvarchar: maxlentype("nvarchar"),
         ntext: () => "ntext",
     }
 }
@@ -106,6 +106,13 @@ function time(base: string) {
 
 function lentype(base: string) {
     return (opts?: { length?: number }) => {
+        if (!opts || !opts.length) return base;
+        return `${base}(${opts.length})`
+    }
+}
+
+function maxlentype(base: string) {
+    return (opts?: { length?: number | "max" }) => {
         if (!opts || !opts.length) return base;
         return `${base}(${opts.length})`
     }
