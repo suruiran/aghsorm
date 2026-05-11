@@ -36,7 +36,6 @@ export class SqliteDialect {
                 frags?: Fragments;
                 kind?: "virtual" | "stored";
             };
-            order?: "ASC" | "DESC";
         }
     ): IDDLColOpts {
         return { ...opts, extra: { ...opts.extra, ...ext } };
