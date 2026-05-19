@@ -58,9 +58,8 @@ export interface IExportOpts {
     colrenderers?: Record<string, IColRendererOpts>;
 }
 
-export interface IDatetimeColRendererOpts {
-    unit?: "auto" | "sec" | "mills" | "nano";
-    layout?: string;
+export interface IInstantColRendererOpts {
+    unit?: "seconds" | "mills" | "nanos";
     tz?: string;
 }
 
@@ -79,7 +78,7 @@ export interface IBitmapColRenderOpts {
     linewidth?: number;
 }
 
-export const ColRendererKinds = ["datetime", "boolean", "enum", "string", "uuid", "hex", "bitmap"] as const;
+export const ColRendererKinds = ["instant", "boolean", "enum", "string", "uuid", "hex", "bitmap"] as const;
 export type ColRendererKind = (typeof ColRendererKinds)[number];
 
 export class ExportHandle {
@@ -123,10 +122,9 @@ export class VariantsHandle {
                     if (tmp.encoding) record.encoding = tmp.encoding;
                     break;
                 }
-                case "datetime": {
-                    const tmp = opts as IDatetimeColRendererOpts;
+                case "instant": {
+                    const tmp = opts as IInstantColRendererOpts;
                     if (tmp.unit) record.unit = tmp.unit;
-                    if (tmp.layout) record.layout = tmp.layout;
                     if (tmp.tz) record.tz = tmp.tz;
                     break;
                 }
@@ -151,7 +149,7 @@ export class VariantsHandle {
                     break;
                 }
                 default: {
-                    throw new Error(`Unsupported column renderer kind: ${kind}`);
+                    throw new Error(`aghsorm: unsupported column renderer kind: ${kind}`);
                 }
             }
         }
@@ -168,15 +166,14 @@ export class VariantsHandle {
         }
     }
 
-    datetime(
+    instant(
         cols: string | string[],
         opts?: {
-            unit?: "auto" | "sec" | "mills" | "nano";
-            layout?: string;
+            unit?: "seconds" | "mills" | "nanos";
             tz?: string;
         }
     ): this {
-        this.colrender(cols, "datetime", opts);
+        this.colrender(cols, "instant", opts);
         return this;
     }
 

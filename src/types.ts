@@ -95,7 +95,7 @@ export class RawSql {
 
 lazy.RawSql = RawSql;
 
-export function sql(eles: TemplateStringsArray, ...exps: IOpableItems[]): RawSql {
+export function sql(eles: TemplateStringsArray, ...exps: any[]): RawSql {
     const tmp = new lazy.Fragments;
     for (let i = 0; i < eles.length; i++) {
         tmp.push(mksqlfrag(eles[i] as string));

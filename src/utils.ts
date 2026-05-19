@@ -1,9 +1,8 @@
 import { mustdbctx } from "./ctxvals.js";
 import { mksqlfrag, mkvalfrag, type Fragments } from "./frag.js";
 import { lazy } from "./lazy.js";
-import type { IOpableItems } from "./op.js";
 
-export function opItemToSQL(item: IOpableItems, temp: Fragments) {
+export function opItemToSQL(item: any, temp: Fragments) {
     if (item instanceof lazy.Identifier) {
         item.op().tosql(temp)
         return;
