@@ -3,6 +3,8 @@ import { IDDLColOpts } from "./ddl.js";
 import { Fragments } from "./frag.js";
 
 export class MssqlDialect {
+    static readonly ClassName = "MssqlDialect";
+
     static tableopts(opts?: {
         check?: Fragments;
         with?: Record<string, any>;

@@ -5,6 +5,8 @@ import { type Fragments } from "./frag.js";
 export type SqliteConflict = "rollback" | "abort" | "fail" | "ignore" | "replace";
 
 export class SqliteDialect {
+    static readonly ClassName = "SqliteDialect";
+
     static tableopts(
         opt?: {
             temp?: boolean;

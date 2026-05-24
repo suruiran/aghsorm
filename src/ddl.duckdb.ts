@@ -5,6 +5,8 @@ import { Fragments, mksqlfrag } from "./frag.js";
 import { rawsql } from "./types.js";
 
 export class DuckdbDialect {
+    static readonly ClassName = "DuckdbDialect";
+
     static tableopts(opts?: {
         temp?: boolean;
         ifNotExists?: boolean;

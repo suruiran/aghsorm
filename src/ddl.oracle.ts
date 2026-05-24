@@ -3,6 +3,8 @@ import { IDDLColOpts } from "./ddl.js";
 import { Fragments } from "./frag.js";
 
 export class OracleDialect {
+    static readonly ClassName = "OracleDialect";
+
     static tableopts(opts?: {
         temporary?: boolean;
         sharded?: boolean;

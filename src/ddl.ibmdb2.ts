@@ -3,6 +3,8 @@ import { IDDLColOpts } from "./ddl.js";
 import { Fragments } from "./frag.js";
 
 export class Ibmdb2Dialect {
+    static readonly ClassName = "Ibmdb2Dialect";
+
     static tableopts(opts?: {
         in?: {
             database?: string;

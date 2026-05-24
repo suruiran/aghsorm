@@ -3,6 +3,8 @@ import { IDDLColOpts } from "./ddl.js";
 import type { Fragments } from "./frag.js";
 
 export class PostgreSQLDialect {
+    static readonly ClassName = "PostgreSQLDialect";
+
     static tableopts(opts?: {
         scope?: "GLOBAL" | "LOCAL";
         temp?: boolean;

@@ -4,6 +4,8 @@ import { Fragments } from "./frag.js";
 import { QuoteSQLStringLiteral } from "./utils.js";
 
 export class MysqlDialect {
+    static readonly ClassName = "MysqlDialect";
+
     static tableopts(opts?: {
         temp?: boolean;
         ifNotExists?: boolean;

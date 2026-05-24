@@ -4,6 +4,8 @@ import { Fragments } from "./frag.js";
 import { QuoteSQLStringLiteral } from "./utils.js";
 
 export class ClickhouseDialect {
+    static readonly ClassName = "ClickhouseDialect";
+
     static tableopts(opts?: {
         temp?: boolean;
         ifNotExists?: boolean;
