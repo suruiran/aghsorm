@@ -469,7 +469,7 @@ export class Op {
 
 lazy.Op = Op;
 
-export const ColOp = new Proxy<Op>({} as any, {
+export const ThisCol = new Proxy<Op>({} as any, {
     get(_target, prop) {
         if (typeof prop !== "string" || !(prop in Op.prototype)) return undefined;
         const colop = new Op("COL PLACEHOLDER", undefined, undefined, { _iscol: { val: "" } });

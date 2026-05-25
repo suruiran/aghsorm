@@ -3,10 +3,12 @@ import { type Op } from "./op.js";
 
 import { lazy } from "./lazy.js";
 import { mustdbctx } from "./ctxvals.js";
+import { type ISQLColumn } from "./table.js";
 
 export interface Fragment {
     sql?: string;
     value?: Value;
+    field?: ISQLColumn | null;
 }
 
 const fragsymbol = Symbol.for("frag");
@@ -20,8 +22,8 @@ export function mksqlfrag(v: string): Fragment {
     return mark({ sql: v })
 }
 
-export function mkvalfrag(v: Value): Fragment {
-    return mark({ value: v })
+export function mkvalfrag(v: Value, field?: ISQLColumn | null): Fragment {
+    return mark({ value: v, field: field as null })
 }
 
 export function isfrag(obj: any): boolean {

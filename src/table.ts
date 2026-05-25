@@ -98,12 +98,13 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
         return this._fields.find((f) => f.name === key) || null;
     }
 
-    private quote_column_name(name: string): string {
+    /** @internal */
+    private quote_column_name(name: string): [string, ISQLColumn | null] {
         const fv = this.field_by_name(name as keyof T & string);
         if (fv) {
-            return mustdbctx().quote("id", fv.sqlname || name);
+            return [mustdbctx().quote("id", fv.sqlname || name), fv];
         }
-        return name;
+        return [name, null];
     }
 
     get ddl(): ITableDDL<keyof T & string> {
@@ -150,15 +151,17 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     /** @internal */
     private _expand_record(record: {
         [k: string]: IOpableItems;
-    }): [string, IOpableItems][] {
+    }): [string, IOpableItems, ISQLColumn | null][] {
         const pairs = Array.from(Object.entries(record)).filter(
             ([, v]) => typeof v !== "undefined"
-        );
+        ).map(v => [...v, null]) as [string, IOpableItems, ISQLColumn | null][];
         if (pairs.length === 0) {
             throw new Error("empty record");
         }
         for (const pair of pairs) {
-            pair[0] = this.quote_column_name(pair[0]);
+            const [qk, sf] = this.quote_column_name(pair[0]);
+            pair[0] = qk;
+            pair[2] = sf;
         }
         return pairs;
     }
@@ -178,7 +181,20 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
                 if (value == null) {
                     eleop = this.column(key as any).op().isnull();
                 } else {
-                    eleop = this.column(key as any).op().eq(value as IOpableItems | Value);
+                    const [qf, sf] = this.quote_column_name(key);
+                    if (sf != null) {
+                        eleop = new Op("EqualInWhereRecord", undefined, undefined, {
+                            fmt(tmp) {
+                                tmp.push(Frags.parenthesis.left);
+                                tmp.push(mksqlfrag(qf));
+                                tmp.push(mksqlfrag("="));
+                                opItemToSQL(value, tmp, sf);
+                                tmp.push(Frags.parenthesis.right);
+                            },
+                        })
+                    } else {
+                        eleop = this.column(key as any).op().eq(value as IOpableItems | Value);
+                    }
                 }
             }
             if (op) {
@@ -209,8 +225,8 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
         tmp.push(mksqlfrag(") VALUES ("));
 
         idx = 0;
-        for (const [, item] of pairs) {
-            opItemToSQL(item, tmp);
+        for (const [, item, sf] of pairs) {
+            opItemToSQL(item, tmp, sf);
             idx++;
             if (idx < size) {
                 tmp.push(Frags.comma);
@@ -282,7 +298,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
                 tmp.push(Frags.parenthesis.left);
                 const size = pairs.length;
                 let i = 0;
-                for (const [k, v] of pairs) {
+                for (const [k, v, f] of pairs) {
                     tmp.push(Frags.parenthesis.left);
                     tmp.push(mksqlfrag(k));
 
@@ -290,7 +306,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
                         tmp.push(Frags.isnull);
                     } else {
                         tmp.push(Frags.equal);
-                        opItemToSQL(v, tmp);
+                        opItemToSQL(v, tmp, f);
                     }
 
                     tmp.push(Frags.parenthesis.right);
@@ -319,10 +335,10 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
 
         const size = pairs.length;
         let idx = 0;
-        for (const [k, v] of pairs) {
+        for (const [k, v, f] of pairs) {
             tmp.push(mksqlfrag(k));
             tmp.push(Frags.equal);
-            opItemToSQL(v, tmp);
+            opItemToSQL(v, tmp, f);
             idx++;
             if (idx < size) {
                 tmp.push(Frags.comma);
@@ -343,7 +359,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
             if (k instanceof Op) {
                 k.tosql(tmp);
             } else {
-                tmp.push(mksqlfrag(this.quote_column_name(k)));
+                tmp.push(mksqlfrag(this.quote_column_name(k)[0]));
             }
             if (idx < size) {
                 tmp.push(Frags.comma);
@@ -392,7 +408,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
                 if (ele instanceof Op) {
                     ele.tosql(tmp);
                 } else {
-                    tmp.push(mksqlfrag(this.quote_column_name(ele)));
+                    tmp.push(mksqlfrag(this.quote_column_name(ele)[0]));
                 }
                 if (idx < size) {
                     tmp.push(Frags.comma);
@@ -429,7 +445,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
         let idx = 0;
         for (const item of opts.orderby) {
             if (typeof item === "string") {
-                temp.push(mksqlfrag(this.quote_column_name(item)));
+                temp.push(mksqlfrag(this.quote_column_name(item)[0]));
             } else {
                 temp.push(mksqlfrag(`${this.quote_column_name(item.field)} ${item.direction}`));
             }

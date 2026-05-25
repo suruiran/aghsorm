@@ -1,7 +1,7 @@
 import { Op, SqlTable, rawsql } from "./index.js";
 import { dummydbctx, runInCtx } from "./dummy.js";
 import { test } from "vitest";
-import { ColOp } from "./op.js";
+import { ThisCol } from "./op.js";
 
 interface IUserModel {
     id: number;
@@ -64,7 +64,7 @@ test("update", () => {
     runInCtx("", dummydbctx, () => {
         table.update(
             {
-                id: ColOp.lte(1),
+                id: ThisCol.lte(1),
             },
             {
                 id: 1,
@@ -192,7 +192,7 @@ test("groupby and having", () => {
 test("colop", () => {
     runInCtx("", dummydbctx, () => {
         table.select({
-            id: ColOp.lte(1)
+            id: ThisCol.lte(1)
         }).export();
     });
 });
