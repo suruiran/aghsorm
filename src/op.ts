@@ -1,9 +1,8 @@
 import { Frags, mksqlfrag, type Fragments } from "./frag.js";
 import { lazy } from "./lazy.js";
 import type { SqlTable } from "./table.js";
-import type { Identifier, RawSql, Value } from "./types.js";
+import type { DBContext, Identifier, RawSql, Value } from "./types.js";
 import { opItemToSQL } from "./utils.js";
-import { getCtx } from "./ctxvals.js";
 
 export type IOpableItems = Value | Identifier | RawSql | Op | SqlTable<any>;
 export type ITypedOpableItem<T> = T | Identifier | RawSql | Op;
@@ -452,14 +451,13 @@ export class Op {
         });
     }
 
-    alias(name: string): Op {
+    alias(ctx: DBContext, name: string): Op {
         return new Op("AS", this, undefined, {
             fmt: (tmp) => {
                 tmp.push(Frags.parenthesis.left);
                 opItemToSQL(this, tmp);
                 tmp.push(Frags.parenthesis.right);
                 tmp.push(mksqlfrag("AS"));
-                const ctx = getCtx();
                 tmp.push(mksqlfrag(ctx ? ctx.quote("id", name) : name));
                 return tmp;
             },

@@ -3,7 +3,6 @@ import { type ExportHandle, type Fragments, type IExportOpts, mksqlfrag } from "
 import { lazy } from "./lazy.js";
 import type { IOpableItems, Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
-import { getCtx } from "./ctxvals.js";
 
 export type Value =
     | string
@@ -33,11 +32,18 @@ export class Identifier {
     private _name: string;
     /** @internal */
     private _fullname: boolean | null;
+    /** @internal */
+    private _ctx: DBContext | null;
 
-    constructor(name: string, opts?: {
-        table?: string,
-        fullname?: boolean,
-    }) {
+    constructor(
+        name: string,
+        opts?: {
+            table?: string,
+            fullname?: boolean,
+            ctx?: DBContext,
+        }
+    ) {
+        this._ctx = opts?.ctx || null;
         this._name = name;
         this._fullname = opts?.fullname || false;
         this._table = opts?.table || null;
@@ -45,7 +51,7 @@ export class Identifier {
 
     string(opts?: { fullname?: boolean }) {
         const fullname = opts?.fullname || this._fullname;
-        const ctx = getCtx();
+        const ctx = this._ctx;
         if (!ctx) {
             if (this._table && fullname) {
                 return `${this._table}.${this._name}`;
@@ -88,8 +94,8 @@ export class RawSql {
         return this._frags;
     }
 
-    export(opts?: IExportOpts): ExportHandle {
-        return this._frags.export(opts);
+    export(ctx: DBContext, opts?: IExportOpts): ExportHandle {
+        return this._frags.export(ctx, opts);
     }
 }
 

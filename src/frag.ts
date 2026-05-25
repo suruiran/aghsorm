@@ -1,8 +1,7 @@
-import { type Value } from "./types.js";
+import { type DBContext, type Value } from "./types.js";
 import { type Op } from "./op.js";
 
 import { lazy } from "./lazy.js";
-import { mustdbctx } from "./ctxvals.js";
 import { type ISQLColumn } from "./table.js";
 
 export interface Fragment {
@@ -242,11 +241,10 @@ export class Fragments {
         return this._items.length;
     }
 
-    export(opts?: IExportOpts): ExportHandle {
+    export(ctx: DBContext, opts?: IExportOpts): ExportHandle {
         const _opts = opts || {};
         const handle = new ExportHandle(_opts);
-        const dbctx = mustdbctx();
-        dbctx.register(this, _opts);
+        ctx.register(this, _opts);
         return handle;
     }
 

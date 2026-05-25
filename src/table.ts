@@ -1,10 +1,9 @@
 import { type Fragments, Frags, mksqlfrag, mkvalfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
 import { IOpableItems, ITypedOpableItem, Op } from "./op.js";
-import { quotetable, sql, type Value, type Identifier } from "./types.js";
+import { quotetable, sql, type Value, type Identifier, DBContext } from "./types.js";
 import { opItemToSQL } from "./utils.js";
 import { type ITableDDL } from "./ddl.js";
-import { mustdbctx } from "./ctxvals.js";
 
 export interface ISQLColumn {
     name: string;
@@ -74,8 +73,11 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     private _fullname: string;
     /** @internal */
     private _ddl: ITableDDL<keyof T & string>;
+    /** @internal */
+    private _cxt: DBContext;
 
-    constructor(options: ITableOptions<T>) {
+    constructor(ctx: DBContext, options: ITableOptions<T>) {
+        this._cxt = ctx;
         this._schema = options.schema;
         this._sqlschema = options.sqlschema || this._schema;
         this._name = options.name;
@@ -102,7 +104,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     private quote_column_name(name: string): [string, ISQLColumn | null] {
         const fv = this.field_by_name(name as keyof T & string);
         if (fv) {
-            return [mustdbctx().quote("id", fv.sqlname || name), fv];
+            return [this._cxt.quote("id", fv.sqlname || name), fv];
         }
         return [name, null];
     }
@@ -121,7 +123,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
 
     get fullname(): string {
         if (!this._fullname) {
-            this._fullname = quotetable(mustdbctx(), this.schema, this.name);
+            this._fullname = quotetable(this._cxt, this.schema, this.name);
         }
         return this._fullname;
     }
@@ -136,6 +138,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
             {
                 table: this.name,
                 fullname: opts?.fullname || false,
+                ctx: this._cxt
             }
         );
     }
@@ -175,7 +178,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
             let eleop: Op;
             if (value instanceof Op) {
                 const col = this.field_by_name(key as keyof T & string);
-                value.__updatecol(mustdbctx().quote("id", col?.sqlname || key));
+                value.__updatecol(this._cxt.quote("id", col?.sqlname || key));
                 eleop = value;
             } else {
                 if (value == null) {
