@@ -1,6 +1,7 @@
 import { ColOptsBuilder, OptsBuild } from "./builder.js";
 import { IDDLColOpts } from "./ddl.js";
 import { Fragments } from "./frag.js";
+import { DBContext } from "./types.js";
 import { QuoteSQLStringLiteral } from "./utils.js";
 
 export class MysqlDialect {
@@ -120,11 +121,11 @@ export class MysqlDialect {
         longtext: (opts?: { charset?: string; collate?: string }) => {
             return mysqltext("LONGTEXT")(opts);
         },
-        enum: (opts: { values: string[]; charset?: string; collate?: string }) => {
-            return mysqltext(`ENUM(${opts.values.map(v => QuoteSQLStringLiteral(v)).join(",")})`)(opts);
+        enum: (ctx: DBContext, opts: { values: string[]; charset?: string; collate?: string }) => {
+            return mysqltext(`ENUM(${opts.values.map(v => QuoteSQLStringLiteral(ctx, v)).join(",")})`)(opts);
         },
-        set: (opts: { values: string[]; charset?: string; collate?: string }) => {
-            return mysqltext(`SET(${opts.values.map(v => QuoteSQLStringLiteral(v)).join(",")})`)(opts);
+        set: (ctx: DBContext, opts: { values: string[]; charset?: string; collate?: string }) => {
+            return mysqltext(`SET(${opts.values.map(v => QuoteSQLStringLiteral(ctx, v)).join(",")})`)(opts);
         },
         json: () => "JSON",
     };

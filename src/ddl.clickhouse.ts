@@ -1,6 +1,7 @@
 import { ColOptsBuilder, OptsBuild } from "./builder.js";
-import { IDDLColOpts } from "./ddl.js";
+import { type IDDLColOpts } from "./ddl.js";
 import { Fragments } from "./frag.js";
+import { type DBContext } from "./types.js";
 import { QuoteSQLStringLiteral } from "./utils.js";
 
 export class ClickhouseDialect {
@@ -79,20 +80,20 @@ export class ClickhouseDialect {
         date: () => "Date",
         date32: () => "Date32",
         time: () => "Time",
-        datetime: (opts?: { tz?: string }) => {
+        datetime: (ctx: DBContext, opts?: { tz?: string }) => {
             if (!opts?.tz) return "DateTime";
-            return `DateTime(${QuoteSQLStringLiteral(opts.tz)})`;
+            return `DateTime(${QuoteSQLStringLiteral(ctx, opts.tz)})`;
         },
         time64: precisiontype("Time64"),
-        datetime64: (opts?: { tz?: string; precision?: number }) => {
+        datetime64: (ctx: DBContext, opts?: { tz?: string; precision?: number }) => {
             let val = "DateTime64";
             const precision = opts?.precision ?? 3;
             if (opts?.tz) {
-                return `${val}(${precision}, ${QuoteSQLStringLiteral(opts.tz)})`;
+                return `${val}(${precision}, ${QuoteSQLStringLiteral(ctx, opts.tz)})`;
             }
             return `${val}(${precision})`;
         },
-        enum: (opts: { items: Iterable<string> | Iterable<[string, number]> }) => {
+        enum: (ctx: DBContext, opts: { items: Iterable<string> | Iterable<[string, number]> }) => {
             const items = [] as [string, number][];
             let idx = 0;
             for (const item of opts.items) {
@@ -103,7 +104,7 @@ export class ClickhouseDialect {
                 }
                 items.push([item, idx]);
             }
-            return `Enum(${items.map(([k, n]) => `${QuoteSQLStringLiteral(k)} = ${n}`).join(", ")})`;
+            return `Enum(${items.map(([k, n]) => `${QuoteSQLStringLiteral(ctx, k)} = ${n}`).join(", ")})`;
         },
         uuid: () => "UUID",
         ipv4: () => "IPv4",
