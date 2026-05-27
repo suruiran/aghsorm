@@ -1,5 +1,5 @@
 import { type IDBDDL } from "./ddl.js";
-import { type ExportHandle, type Fragments, type IExportOpts, mksqlfrag } from "./frag.js";
+import { type ExportHandle, Fragment, type Fragments, type IExportOpts, isfrag, mksqlfrag } from "./frag.js";
 import { lazy } from "./lazy.js";
 import type { IOpableItems, Op } from "./op.js";
 import { opItemToSQL } from "./utils.js";
@@ -112,8 +112,17 @@ export function sql(eles: TemplateStringsArray, ...exps: any[]): RawSql {
     return new RawSql(tmp);
 }
 
-export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | bigint | number | string | null)[]): Fragments {
+export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | Fragment | bigint | number | string | null)[]): Fragments {
     const tmp = new lazy.Fragments;
+
+    function pushfrag(ele: Fragment) {
+        if (ele.sql) {
+            tmp.push(ele as Fragment);
+        } else {
+            throw new Error(`aghsorm: rawsql can not contains value fragment`);
+        }
+    }
+
     for (let i = 0; i < eles.length; i++) {
         tmp.push(mksqlfrag(eles[i] as string));
         if (i < exps.length) {
@@ -123,7 +132,13 @@ export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | bigint 
                 continue;
             }
             if (ele instanceof lazy.Fragments) {
-                tmp.push(...ele);
+                for (const ef of ele) {
+                    pushfrag(ef);
+                }
+                continue;
+            }
+            if (isfrag(ele)) {
+                pushfrag(ele as Fragment);
                 continue;
             }
             tmp.push(mksqlfrag(`${ele}`));

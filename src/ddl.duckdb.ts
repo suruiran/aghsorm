@@ -1,7 +1,7 @@
 import { ColOptsBuilder, OptsBuild } from "./builder.js";
 import { IDDLColOpts } from "./ddl.js";
 import { Fragments, mksqlfrag } from "./frag.js";
-import { type DBContext, rawsql } from "./types.js";
+import { rawsql } from "./types.js";
 
 export class DuckdbDialect {
     static readonly ClassName = "DuckdbDialect";
@@ -86,7 +86,6 @@ export class DuckdbDialect {
     }
 
     static createseq(
-        ctx: DBContext,
         name: string,
         opts?: {
             start?: number | bigint;
@@ -97,7 +96,7 @@ export class DuckdbDialect {
     ): Fragments {
         const start = opts?.start ? opts?.start : 1;
         const incr = opts?.incr ? opts.incr : 1;
-        const tmp = rawsql`CREATE SEQUENCE ${ctx.quote("id", name)} START WITH ${start} INCREMENT BY ${incr}`;
+        const tmp = rawsql`CREATE SEQUENCE ${mksqlfrag(name, "id")} START WITH ${start} INCREMENT BY ${incr}`;
         if (opts?.maxval) tmp.push(...rawsql`MAXVALUE ${opts.maxval}`);
         if (opts?.cycle) tmp.push(mksqlfrag(`CYCLE`));
         return tmp;

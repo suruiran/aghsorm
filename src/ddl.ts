@@ -13,7 +13,7 @@ export interface IDDLColOpts {
 
 export interface IDDLCol {
     name: string;
-    sqltype: string;
+    sqltype: string | Fragments;
     opts?: IDDLColOpts;
 }
 
@@ -29,22 +29,4 @@ export interface ITableDDL<K> {
 
 export interface IDBDDL {
     addtable(name: string, cols: IDDLCol[], opts?: Record<string, any>): Fragments;
-}
-
-export function renderddl(frags: Fragments): string {
-    const tmp = [] as string[];
-    const len = frags.length;
-    let i = 0;
-    for (const ele of frags) {
-        if (typeof ele.sql === "string") {
-            tmp.push(ele.sql);
-            i++;
-            if (i < len && (ele.sql.trim() !== "")) {
-                tmp.push(" ");
-            }
-            continue;
-        }
-        throw new Error("Invalid fragment type");
-    }
-    return tmp.join("");
 }

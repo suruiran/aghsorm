@@ -6,6 +6,9 @@ import { type ISQLColumn } from "./table.js";
 
 export interface Fragment {
     sql?: string;
+    sqlkind?: "id" | "stringliteral" | undefined;
+
+    // val
     value?: Value;
     field?: ISQLColumn | null;
 }
@@ -17,8 +20,8 @@ function mark(v: Fragment): Fragment {
     return v;
 }
 
-export function mksqlfrag(v: string): Fragment {
-    return mark({ sql: v })
+export function mksqlfrag(v: string, kind?: "id" | "stringliteral" | undefined): Fragment {
+    return mark({ sql: v, sqlkind: kind })
 }
 
 export function mkvalfrag(v: Value, field?: ISQLColumn | null): Fragment {
@@ -26,7 +29,7 @@ export function mkvalfrag(v: Value, field?: ISQLColumn | null): Fragment {
 }
 
 export function isfrag(obj: any): boolean {
-    return Reflect.get(obj, fragsymbol) === true;
+    return typeof obj === "object" && obj != null && Reflect.get(obj, fragsymbol) === true;
 }
 
 export const Frags = {
@@ -54,6 +57,7 @@ export interface IColRendererOpts {
 }
 
 export interface IExportOpts {
+    ctx?: DBContext;
     label?: string;
     isquery?: boolean;
     colrenderers?: Record<string, IColRendererOpts>;

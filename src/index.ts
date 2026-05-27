@@ -7,10 +7,7 @@ export {
 } from "./frag.js";
 export {
     type ITableDDL, type IDBDDL, type IDDLCol,
-    renderddl,
 } from "./ddl.js";
-export { QuoteSQLStringLiteral } from "./utils.js";
-
 export { SqliteDialect } from "./ddl.sqlite.js";
 export { MysqlDialect } from "./ddl.mysql.js";
 export { PostgreSQLDialect } from "./ddl.postgresql.js";

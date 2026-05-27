@@ -1,7 +1,6 @@
-import { mksqlfrag, mkvalfrag, type Fragments } from "./frag.js";
+import { Fragment, mksqlfrag, mkvalfrag, type Fragments } from "./frag.js";
 import { lazy } from "./lazy.js";
 import { type ISQLColumn } from "./table.js";
-import { type DBContext } from "./types.js";
 
 export function opItemToSQL(item: any, temp: Fragments, field?: ISQLColumn | null) {
     if (item instanceof lazy.Identifier) {
@@ -27,7 +26,14 @@ export function opItemToSQL(item: any, temp: Fragments, field?: ISQLColumn | nul
     temp.push(mkvalfrag(item, field));
 }
 
-
-export function QuoteSQLStringLiteral(ctx: DBContext, v: string) {
-    return ctx.quote("stringliteral", v);
+export function jointofrags<I>(temp: Fragments, iv: Iterable<I>, size: number, onele: (e: I) => Fragments, sep: Fragment) {
+    let i = 0;
+    for (const element of iv) {
+        const fs = onele(element);
+        temp.push(...fs);
+        i++;
+        if (i < size) {
+            temp.push(sep);
+        }
+    }
 }

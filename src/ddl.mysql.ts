@@ -1,8 +1,8 @@
 import { ColOptsBuilder, OptsBuild } from "./builder.js";
 import { IDDLColOpts } from "./ddl.js";
-import { Fragments } from "./frag.js";
-import { DBContext } from "./types.js";
-import { QuoteSQLStringLiteral } from "./utils.js";
+import { Fragments, mksqlfrag } from "./frag.js";
+import { rawsql } from "./types.js";
+import { jointofrags } from "./utils.js";
 
 export class MysqlDialect {
     static readonly ClassName = "MysqlDialect";
@@ -121,11 +121,19 @@ export class MysqlDialect {
         longtext: (opts?: { charset?: string; collate?: string }) => {
             return mysqltext("LONGTEXT")(opts);
         },
-        enum: (ctx: DBContext, opts: { values: string[]; charset?: string; collate?: string }) => {
-            return mysqltext(`ENUM(${opts.values.map(v => QuoteSQLStringLiteral(ctx, v)).join(",")})`)(opts);
+        enum: (opts: { values: string[]; }) => {
+            const tmp = new Fragments();
+            tmp.push(mksqlfrag("ENUM("))
+            jointofrags(tmp, opts.values, opts.values.length, (k) => rawsql`${mksqlfrag(k, "stringliteral")}`, mksqlfrag(`,`))
+            tmp.push(mksqlfrag(`)`));
+            return tmp;
         },
-        set: (ctx: DBContext, opts: { values: string[]; charset?: string; collate?: string }) => {
-            return mysqltext(`SET(${opts.values.map(v => QuoteSQLStringLiteral(ctx, v)).join(",")})`)(opts);
+        set: (opts: { values: string[]; }) => {
+            const tmp = new Fragments();
+            tmp.push(mksqlfrag("SET("))
+            jointofrags(tmp, opts.values, opts.values.length, (k) => rawsql`${mksqlfrag(k, "stringliteral")}`, mksqlfrag(`,`))
+            tmp.push(mksqlfrag(`)`));
+            return tmp;
         },
         json: () => "JSON",
     };

@@ -1,8 +1,8 @@
 import { ColOptsBuilder, OptsBuild } from "./builder.js";
 import { type IDDLColOpts } from "./ddl.js";
-import { Fragments } from "./frag.js";
-import { type DBContext } from "./types.js";
-import { QuoteSQLStringLiteral } from "./utils.js";
+import { Fragments, mksqlfrag } from "./frag.js";
+import { rawsql } from "./types.js";
+import { jointofrags } from "./utils.js";
 
 export class ClickhouseDialect {
     static readonly ClassName = "ClickhouseDialect";
@@ -80,20 +80,20 @@ export class ClickhouseDialect {
         date: () => "Date",
         date32: () => "Date32",
         time: () => "Time",
-        datetime: (ctx: DBContext, opts?: { tz?: string }) => {
+        datetime: (opts?: { tz?: string }) => {
             if (!opts?.tz) return "DateTime";
-            return `DateTime(${QuoteSQLStringLiteral(ctx, opts.tz)})`;
+            return rawsql`DateTime(${mksqlfrag(opts.tz, "stringliteral")})`;
         },
         time64: precisiontype("Time64"),
-        datetime64: (ctx: DBContext, opts?: { tz?: string; precision?: number }) => {
+        datetime64: (opts?: { tz?: string; precision?: number }) => {
             let val = "DateTime64";
             const precision = opts?.precision ?? 3;
             if (opts?.tz) {
-                return `${val}(${precision}, ${QuoteSQLStringLiteral(ctx, opts.tz)})`;
+                return rawsql`${val}(${precision}, ${mksqlfrag(opts.tz, "stringliteral")})`;
             }
             return `${val}(${precision})`;
         },
-        enum: (ctx: DBContext, opts: { items: Iterable<string> | Iterable<[string, number]> }) => {
+        enum: (opts: { items: Iterable<string> | Iterable<[string, number]> }) => {
             const items = [] as [string, number][];
             let idx = 0;
             for (const item of opts.items) {
@@ -104,7 +104,11 @@ export class ClickhouseDialect {
                 }
                 items.push([item, idx]);
             }
-            return `Enum(${items.map(([k, n]) => `${QuoteSQLStringLiteral(ctx, k)} = ${n}`).join(", ")})`;
+            const tmp = new Fragments();
+            tmp.push(mksqlfrag("Enum("))
+            jointofrags(tmp, items, items.length, ([k, n]) => rawsql`${mksqlfrag(k, "stringliteral")} = ${n}`, mksqlfrag(`, `))
+            tmp.push(mksqlfrag(`)`));
+            return tmp;
         },
         uuid: () => "UUID",
         ipv4: () => "IPv4",
