@@ -181,4 +181,11 @@ test("colop", () => {
     table.select({
         id: ThisCol.lte(1)
     }).export(dummydbctx);
+
+
+    table.update({
+        id: ThisCol.lte(1)
+    }, {
+        amount: ThisCol.plus(100)
+    }).export(dummydbctx);
 });

@@ -155,18 +155,21 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
     private _expand_record(record: {
         [k: string]: IOpableItems;
     }): [string, IOpableItems, ISQLColumn | null][] {
-        const pairs = Array.from(Object.entries(record)).filter(
+        const items = Array.from(Object.entries(record)).filter(
             ([, v]) => typeof v !== "undefined"
         ).map(v => [...v, null]) as [string, IOpableItems, ISQLColumn | null][];
-        if (pairs.length === 0) {
+        if (items.length === 0) {
             throw new Error("empty record");
         }
-        for (const pair of pairs) {
+        for (const pair of items) {
             const [qk, sf] = this.quote_column_name(pair[0]);
             pair[0] = qk;
+            if (pair[1] instanceof Op) {
+                pair[1].__updatecol(qk);
+            }
             pair[2] = sf;
         }
-        return pairs;
+        return items;
     }
 
     /** @internal */
