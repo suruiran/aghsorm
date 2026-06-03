@@ -174,7 +174,7 @@ export class VariantsHandle {
     instant(
         cols: string | string[],
         opts?: {
-            unit?: "seconds" | "mills" | "nanos";
+            unit?: "seconds" | "mills" | "nanos" | "s" | "ms" | "ns";
             tz?: string;
         }
     ): this {
