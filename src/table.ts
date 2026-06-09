@@ -453,7 +453,7 @@ export class SqlTable<T extends { [K in keyof T & string]: Value }> {
             if (typeof item === "string") {
                 temp.push(mksqlfrag(this.quote_column_name(item)[0]));
             } else {
-                temp.push(mksqlfrag(`${this.quote_column_name(item.field)} ${item.direction}`));
+                temp.push(mksqlfrag(`${this.quote_column_name(item.field)[0]} ${item.direction}`));
             }
             idx++;
             if (idx < size) {
