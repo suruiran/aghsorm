@@ -1,11 +1,11 @@
 # AghsORM
 
-Aghs's evolved SQL generator.
+An SQL ORM upgraded with Aghanim's Shard. But currently, only the SQL building part has been implemented.
 
 # Example
 
 ```typescript
-interface User {
+class User {
     id: number;
     name: string;
     age: number;
@@ -22,7 +22,9 @@ const users = new SqlTable<User>({
 });
 
 users.delete(
-    users.field("id").gt(Op.plus(1, 2).bracket()),
+    {
+        id: ThisCol.gt(Op.plus(1, 2).bracket()),
+    }
     {
         orderby: ["age"],
         limit: 10,

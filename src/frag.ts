@@ -4,16 +4,19 @@ import { type Op } from "./op.js";
 import { lazy } from "./lazy.js";
 import { type ISQLColumn } from "./table.js";
 
-export interface Fragment {
-    sql?: string;
+export type Fragment = |
+{
+    $kind: "sql";
+    sql: string;
     sqlkind?: "id" | "stringliteral" | undefined;
-
-    // val
-    value?: Value;
+} |
+{
+    $kind: "value";
+    value: Value;
     field?: ISQLColumn | null;
 }
 
-const fragsymbol = Symbol.for("frag");
+const fragsymbol = Symbol("frag");
 
 function mark(v: Fragment): Fragment {
     Object.defineProperty(v, fragsymbol, { value: true, configurable: false, writable: false, enumerable: false });
@@ -21,11 +24,11 @@ function mark(v: Fragment): Fragment {
 }
 
 export function mksqlfrag(v: string, kind?: "id" | "stringliteral" | undefined): Fragment {
-    return mark({ sql: v, sqlkind: kind })
+    return mark({ $kind: "sql", sql: v, sqlkind: kind })
 }
 
 export function mkvalfrag(v: Value, field?: ISQLColumn | null): Fragment {
-    return mark({ value: v, field: field as null })
+    return mark({ $kind: "value", value: v, field: field as null })
 }
 
 export function isfrag(obj: any): boolean {

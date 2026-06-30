@@ -102,7 +102,7 @@ export class Op {
     /** @internal */
     private _bracket: boolean;
     /** @internal */
-    private _iscol: {
+    private _col_placeholder: {
         val: string;
     } | null;
     /** @internal */
@@ -116,9 +116,7 @@ export class Op {
             fmt?: OpToSQLFunc | null;
             bracket?: boolean;
             /** @internal */
-            _iscol?: {
-                val: string;
-            };
+            _col_placeholder?: { val: string; };
             /** @internal */
             _local?: any;
         }
@@ -128,16 +126,16 @@ export class Op {
         this._right = typeof right !== "undefined" ? { val: right } : null;
         this._tosql = opts?.fmt || null;
         this._bracket = opts?.bracket || false;
-        this._iscol = opts?._iscol || null;
+        this._col_placeholder = opts?._col_placeholder || null;
         this._local = opts?._local || null;
     }
 
     tosql(tmp: Fragments) {
-        if (this._iscol != null) {
-            if (!this._iscol.val) {
-                throw new Error(`aghsorm.ColOp: column name is empty`);
+        if (this._col_placeholder != null) {
+            if (!this._col_placeholder.val) {
+                throw new Error(`aghsorm.ThisCol: column name is empty`);
             }
-            tmp.push(mksqlfrag(this._iscol.val));
+            tmp.push(mksqlfrag(this._col_placeholder.val));
             return;
         }
 
@@ -160,11 +158,11 @@ export class Op {
 
     /** @internal */
     __updatecol(val: string) {
-        if (this._iscol != null) {
-            if (this._iscol.val && this._iscol.val !== val) {
-                throw new Error(`aghsorm.ColOp: can not be reused, Please use a factory function to do that.`);
+        if (this._col_placeholder != null) {
+            if (this._col_placeholder.val && this._col_placeholder.val !== val) {
+                throw new Error(`aghsorm.ThisCol: can not be reused, Please use a factory function to do that.`);
             }
-            this._iscol.val = val;
+            this._col_placeholder.val = val;
         }
         if (this._left != null && this._left.val instanceof Op) {
             this._left.val.__updatecol(val);
@@ -470,7 +468,7 @@ lazy.Op = Op;
 export const ThisCol = new Proxy<Op>({} as any, {
     get(_target, prop) {
         if (typeof prop !== "string" || !(prop in Op.prototype)) return undefined;
-        const colop = new Op("COL PLACEHOLDER", undefined, undefined, { _iscol: { val: "" } });
+        const colop = new Op("COL PLACEHOLDER", undefined, undefined, { _col_placeholder: { val: "" } });
         const fnc = Reflect.get(colop, prop, colop) as () => void;
         return fnc.bind(colop);
     },

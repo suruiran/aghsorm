@@ -12,12 +12,12 @@ export const dummydbctx: DBContext = {
         const tmp = [] as string[];
         const args = [] as Value[];
         for (const ele of fragments) {
-            if (ele.sql != null) {
+            if (ele.$kind === "sql") {
                 tmp.push(ele.sql);
                 continue;
             }
             tmp.push(`\$${args.length + 1}`);
-            args.push(ele.value!);
+            args.push(ele.value);
         }
         console.log([tmp.join(" "), args]);
     },
