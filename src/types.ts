@@ -116,7 +116,7 @@ export function rawsql(eles: TemplateStringsArray, ...exps: (Fragments | Fragmen
     const tmp = new lazy.Fragments;
 
     function pushfrag(ele: Fragment) {
-        if (ele.sql) {
+        if (ele.$kind === "sql") {
             tmp.push(ele as Fragment);
         } else {
             throw new Error(`aghsorm: rawsql can not contains value fragment`);
